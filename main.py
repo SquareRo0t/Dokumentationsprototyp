@@ -209,64 +209,76 @@ def get_scenario_title(scenario_number: int) -> str:
 # --- Admin vy ---
 with st.sidebar:
     admin_password = st.text_input("Admin", type="password", label_visibility="collapsed")
-
-    if admin_password == st.secrets["ADMIN_PASSWORD"]:
+    if admin_password == st.secrets.get("ADMIN_PASSWORD", ""):
         st.title("Admin - Ändringslogg")
-
+        
         try:
             ws = get_worksheet()
-            all_data = ws.get_all_records(expected_headers=[
-                "created_at", "type", "participant_id", "scenario", 
-                "category", "text", "keywords", "time_seconds", ""
-            ])
-
-            if not all_data:
+            
+            # Hämta alla värden utan expected_headers (det är det som orsakar felet)
+            all_values = ws.get_all_values()
+            
+            if not all_values or len(all_values) <= 1:
                 st.info("Ingen data än.")
             else:
+                # Första raden = headers
+                headers = all_values[0]
+                data_rows = all_values[1:]
+                
+                # Skapa lista av dicts manuellt (säkrare än expected_headers)
+                all_data = []
+                for row in data_rows:
+                    # Fyll ut korta rader med tomma strängar
+                    row_padded = row + [""] * (len(headers) - len(row))
+                    record = dict(zip(headers, row_padded))
+                    all_data.append(record)
+
                 # --- Sammanfattning ---
                 ai_rows = [row for row in all_data if row.get("type") == "ai"]
                 manual_rows = [row for row in all_data if row.get("type") == "manual"]
-                summary_rows = [row for row in all_data if row.get("type") == "SUMMARY"]
-
+                summary_rows = [row for row in all_data if row.get("type") in ("SUMMARY", "SUS")]
+                
                 st.markdown("### Sammanfattning")
                 st.metric("Antal deltagare", len(summary_rows))
                 st.metric("Manuella svar", len(manual_rows))
-                st.metric("AI-svae", len(ai_rows))
-
-                # --- Redigeringsstatistik ---
+                st.metric("AI-svar", len(ai_rows))
+                
+                # Redigeringsstatistik
                 edited_count = sum(
                     1 for row in ai_rows
                     if "Redigerad: True" in str(row.get("keywords", ""))
                 )
                 st.metric("AI-texter som redigerades", f"{edited_count} av {len(ai_rows)}")
-
                 st.divider()
 
                 # --- Per deltagare ---
                 st.markdown("### Per deltagare")
-                participants = list(set(row.get("participants_id") for row in summary_rows))
-
+                # Använd participant_id istället för participants_id (du hade stavfel tidigare)
+                participants = sorted({row.get("participant_id") for row in summary_rows if row.get("participant_id")})
+                
                 for p in participants:
-                    with st.expander(f"Människa {p}"):
-
+                    with st.expander(f"Deltagare: {p or 'Okänd'}"):
                         p_summary = next((r for r in summary_rows if r.get("participant_id") == p), None)
                         if p_summary:
                             st.text(p_summary.get("text", ""))
-                            st.text(f"SUS: {p_summary.get("keywords", "")}")
-
+                            st.text(f"SUS: {p_summary.get('keywords', '')}")
+                        
                         p_ai = [r for r in ai_rows if r.get("participant_id") == p]
                         for row in p_ai:
-                            st.markdown(f"**Scenario {row.get("scenario")}**")
-                            st.text(f"Kategori: {row.get("category","")}")
-                            st.text(f"Text: {row.get("text", "")}")
+                            st.markdown(f"**Scenario {row.get('scenario')}**")
+                            st.text(f"Kategori: {row.get('category','')}")
+                            st.text(f"Text: {row.get('text', '')}")
+                            
                             keywords = row.get("keywords", "")
                             if "Redigerad: True" in keywords:
                                 st.warning("Texten redigerades")
                             else:
                                 st.success("Oförändrad")
                             st.divider()
+
         except Exception as e:
             st.error(f"Kunde inte hämta data: {e}")
+            st.exception(e)  # Visa full traceback i admin-läge (hjälpsamt vid felsökning)
 
 
 # --- Startskärm ---
