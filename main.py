@@ -41,7 +41,7 @@ def save_to_sheets(data: dict):
             data.get("text", ""),
             data.get("keywords", ""),
             data.get("time_seconds", 0),
-            data.get("notes", "")
+            data.get("notes", ""),
             ""
         ])
         ws.append_row(row)
