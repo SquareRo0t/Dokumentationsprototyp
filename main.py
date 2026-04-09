@@ -306,7 +306,7 @@ with st.sidebar:
                 # Sus sammanfattning
                 st.divider()
                 summary_df = df[df.iloc[:,1] == "Summary"]
-                if not summary_df.empty():
+                if not summary_df.empty:
                     st.subheader("SUS resultat och tid")
                     st.dataframe(summary_df[["participant_id", "text", "keywords"]], use_container_width=True)
 
