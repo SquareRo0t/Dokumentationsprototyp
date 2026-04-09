@@ -12,8 +12,8 @@ def get_worksheet():
     """ Anslut till Google Sheets - fungerar både lokalt och i Streamlit Cloud"""
     try:
         # För lokal testning (om du har service.account.json i samma mapp)
-        credentials = Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"],
+        credentials = Credentials.from_service_account_file(
+            "service_account.json",
             scopes = [
                 "https://www.googleapis.com/auth/spreadsheets",
                 "https://www.googleapis.com/auth/drive"
@@ -23,7 +23,9 @@ def get_worksheet():
         sheet = client.open("Dokumentationsprototyp - Svar")
         worksheet = sheet.worksheet("Sheet1")
         return worksheet
-
+    except FileNotFoundError as e:
+        st.error(f"Kan inte ansluta till Google Sheets: {e}")
+        st.stop()
     except Exception as e:
         st.error(f"Kan inte ansluta till Google Sheets: {e}")
         st.stop()
@@ -41,10 +43,8 @@ def save_to_sheets(data: dict):
             data.get("text", ""),
             data.get("keywords", ""),
             data.get("time_seconds", 0),
-            data.get("notes", ""),
             ""
         ])
-        ws.append_row(row)
     except Exception as e:
         pass # Tyst felhantering för användarupplevelsen
 
@@ -208,36 +208,21 @@ def get_scenario_title(scenario_number: int) -> str:
 
 # --- Admin vy ---
 with st.sidebar:
-    st.header("Admin")
-
     admin_password = st.text_input("Admin", type="password", label_visibility="collapsed")
 
-    if admin_password == st.secrets["ADMIN_PASSWORD"]:
+    if admin_password == "ditt-lösenord":
         st.title("Admin - Ändringslogg")
 
         try:
             ws = get_worksheet()
+            all_data = ws.get_all_records(expected_headers=[
+            "created_at", "type", "participant_id", "scenario", 
+            "category", "text", "keywords", "time_seconds", ""
+            ])
 
-            # Hämta all data med explicit hantering av headers
-            all_values = ws.get_all_records()
-
-            if len(all_values) < 2:
+            if not all_data:
                 st.info("Ingen data än.")
             else:
-                headers = all_values[0]
-                data_rows = all_values[1:]
-
-                # Skapa Dataframe liknande struktur manuellt
-                all_data = []
-                for row in data_rows:
-                    record = {}
-                    for i, header in enumerate(headers):
-                        if i < len(row):
-                            # Ge tomma headers ett unikt namn
-                            col_name = header.strip() if header.strip() else f"Column_{i+1}"
-                            record[col_name] = row[i]
-                    all_data.append(record)
-
                 # --- Sammanfattning ---
                 ai_rows = [row for row in all_data if row.get("type") == "ai"]
                 manual_rows = [row for row in all_data if row.get("type") == "manual"]
@@ -259,34 +244,30 @@ with st.sidebar:
 
                 # --- Per deltagare ---
                 st.markdown("### Per deltagare")
-
-                participant_field = "participant_id" if any("participant_id" in row for row in summary_rows) else "participant_id"
-
-                participants = list(set(row.get(participant_field, "Okänd") for row in summary_rows))
+                participants = list(set(row.get("participants_id") for row in summary_rows))
 
                 for p in participants:
                     with st.expander(f"Människa {p}"):
 
-                        p_summary = next((r for r in summary_rows if r.get(participant_field) == p), None)
+                        p_summary = next((r for r in summary_rows if r.get("participant_id") == p), None)
                         if p_summary:
                             st.text(p_summary.get("text", ""))
                             st.text(f"SUS: {p_summary.get("keywords", "")}")
 
-                        p_ai = [r for r in ai_rows if r.get(participant_field) == p]
+                        p_ai = [r for r in ai_rows if r.get("participant_id") == p]
                         for row in p_ai:
                             st.markdown(f"**Scenario {row.get("scenario")}**")
                             st.text(f"Kategori: {row.get("category","")}")
                             st.text(f"Text: {row.get("text", "")}")
-                            
                             keywords = row.get("keywords", "")
                             if "Redigerad: True" in keywords:
                                 st.warning("Texten redigerades")
                             else:
                                 st.success("Oförändrad")
                             st.divider()
-
         except Exception as e:
             st.error(f"Kunde inte hämta data: {e}")
+
 
 
 # --- Startskärm ---
