@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 import gspread
+import pandas as pd
 
 from datetime import datetime
 from groq import Groq
@@ -34,16 +35,36 @@ def save_to_sheets(data: dict):
     """Spara data till Google Sheets"""
     try:
         ws = get_worksheet()
-        ws.append_row([
-            data.get("created_at"),
-            data.get("type"),
-            data.get("participant_id", st.session_state.get("user_title", "Vårdpersonal")),
-            data.get("scenario"),
-            data.get("category", ""),
-            data.get("text", ""),
-            data.get("keywords", ""),
-            data.get("time_seconds", 0),
+
+        # För AI svar sparar vi extra kolumner
+        if data.get("type") == "ai":
+            ws.append_row([
+                data.get("created_at"),
+                data.get("type"),
+                data.get("participant_id", st.session_state.get("user_title", "Vårdpersonal")),
+                data.get("scenario"),
+                data.get("category", ""),
+                data.get("text", ""),
+                data.get("keywords", ""),
+                data.get("time_seconds", 0),
+                data.get("original_text", ""),
+                data.get("diff_text", "")
         ])
+        else:
+            # Vanlig manual eller Summary
+            ws.append_row([
+                data.get("created_at"),
+                data.get("type"),
+                data.get("participant_id", st.session_state.get("user_title", "Vårdpersonal")),
+                data.get("scenario"),
+                data.get("category", ""),
+                data.get("text", ""),
+                data.get("keywords", ""),
+                data.get("time_seconds", 0),
+                "",
+                ""
+        ])
+                        
     except Exception as e:
         pass # Tyst felhantering för användarupplevelsen
 
@@ -205,79 +226,92 @@ def get_scenario_title(scenario_number: int) -> str:
     }
     return titles.get(scenario_number, f"Scenario {scenario_number}")
 
-# --- Admin vy (förbättrad) ---
+# --- Admin vy ---
 with st.sidebar:
-    admin_password = st.text_input("Admin-lösenord", type="password", label_visibility="collapsed")
-    
-    if admin_password == st.secrets.get("ADMIN_PASSWORD"):
-        st.title("🔧 Admin - Alla svar")
-        
+    admin_password = st.text_input("Admin", type="password", label_visibility="collapsed")
+
+    if admin_password == st.secrets["ADMIN_PASSWORD"]:
+        st.title("Admin - Ändringslogg")
+
         try:
             ws = get_worksheet()
-            
-            # Hämta ALLT som lista av listor (säkrare än get_all_records när headers är stökiga)
             all_values = ws.get_all_values()
-            
-            if not all_values or len(all_values) < 2:
+
+            if not  all_values or len(all_values) < 2:
                 st.info("Ingen data sparad ännu.")
             else:
                 headers = all_values[0]
                 data_rows = all_values[1:]
-                
-                # Skapa DataFrame (mycket enklare att jobba med)
-                import pandas as pd
+
+                # Skapa Dataframe
                 df = pd.DataFrame(data_rows, columns=headers)
-                
+
                 # Rensa eventuella tomma kolumner
                 df = df.loc[:, df.columns.notna() & (df.columns != "")]
-                
+
                 st.success(f"Totalt {len(df)} rader hämtade")
-                
+
                 # Filter
-                typ_filter = st.selectbox("Visa typ", ["Alla", "manual", "ai", "SUMMARY"])
+                typ_filter = st.selectbox("Visa typ", ["Alla", "manual", "ai", "Summary"])
                 if typ_filter != "Alla":
-                    df = df[df.iloc[:,1] == typ_filter]   # Kolumn 1 är "type"
-                
+                    df_filtered = df[df.iloc[:,1] == typ_filter]
+                else:
+                    df_filtered = df
+
                 # Visa tabell
                 st.dataframe(
                     df,
                     use_container_width=True,
                     hide_index=True
                 )
-                
-                # Separata sektioner för AI-svar (det du frågade om)
+
+                # Separata sektioner för AI-svar
                 st.divider()
                 st.subheader("AI-genererade texter (med redigering)")
-                
-                ai_df = df[df.iloc[:,1] == "ai"].copy() if len(df) > 0 else pd.DataFrame()
-                
+
+                ai_df = df.iloc[:,1] == "ai".copy() if len(df) > 0 else pd.DataFrame()
+
                 if not ai_df.empty:
                     for idx, row in ai_df.iterrows():
-                        with st.expander(f"Scenario {row.iloc[3]} — {row.iloc[2]}"):   # scenario + participant_id
-                            st.caption(f"Kategori: {row.iloc[4]}")
-                            st.write("**AI-text (redigerad eller ej):**")
-                            st.text_area("Text", value=row.iloc[5], height=120, disabled=True)  # text-kolumn
+                        scenario = row.iloc[3] if len(row) > 3 else ""
+                        participant = row.iloc[2] if len(row) > 2 else ""
+                        final_text = row.iloc[5] if len(row) > 5 else ""      # Kolumn för "text"
+                        original = row.iloc[8] if len(row) > 8 else ""         # Kolumn för "original_text"
+                        diff = row.iloc[9] if len(row) > 9 else ""             # Kolumn för "diff_text"
+                        category = row.iloc[4] if len(row) > 4 else ""
+                        time_sec = row.iloc[7] if len(row) > 7 else 0
+                        
+                        with st.expander(f"Scenario {scenario} — {participant}"):
+                            st.caption(f"**Kategori:** {category}")
                             
-                            keywords = str(row.iloc[6]) if len(row) > 6 else ""
-                            if "Redigerad: True" in keywords:
-                                st.warning("✅ Användaren redigerade texten")
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.markdown("**Original AI-förslag:**")
+                                st.text_area("Original", value=original, height=140, disabled=True, key=f"orig_{idx}")
+                            with col2:
+                                st.markdown("**Slutlig text efter redigering:**")
+                                st.text_area("Redigerad", value=final_text, height=140, disabled=True, key=f"edit_{idx}")
+                            
+                            if original.strip() != final_text.strip() and original.strip() != "":
+                                st.warning("**Testaren har ändrat texten**")
+                                st.markdown("**Skillnad:**")
+                                st.text_area("Vad som ändrades", value=diff, height=100, disabled=True)
                             else:
-                                st.success("Oförändrad (AI-texten godkändes direkt)")
+                                st.success("Inga ändringar – testaren godkände AI-förslaget direkt")
                             
-                            st.caption(f"Tid: {row.iloc[7]} sekunder")
+                            st.caption(f"Tid använd: {time_sec} sekunder")
                 else:
-                    st.info("Inga AI-svar ännu.")
+                    st.info("Inga AI-svar har sparats ännu.")
                 
-                # SUS-sammanfattning
+                # Sus sammanfattning
                 st.divider()
-                summary_df = df[df.iloc[:,1] == "SUMMARY"]
-                if not summary_df.empty:
-                    st.subheader("SUS-resultat och tid")
+                summary_df = df[df.iloc[:,1] == "Summary"]
+                if not summary_df.empty():
+                    st.subheader("SUS resultat och tid")
                     st.dataframe(summary_df[["participant_id", "text", "keywords"]], use_container_width=True)
-                    
+
         except Exception as e:
             st.error(f"Kunde inte hämta data från Google Sheets: {e}")
-            st.info("Kontrollera att rubrikraden i Sheet1 stämmer och att det inte finns tomma kolumner längst till höger.")
 
 
 # --- Startskärm ---
@@ -563,6 +597,12 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
         else:
             original = st.session_state.get(f"ai_result_{current_scenario}_original", "")
             was_edited = original.strip() != final_text #  <- Jämför
+
+            # Beräkna vad som ändrades
+            if was_edited:
+                diff_text = f"ÄND RAD: {final_text}\n\nORIGINAL: {original}"
+            else:
+                diff_text = "Inga ändringar"
             
             time_spent = elapsed
 
@@ -578,7 +618,9 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
                 "category": category,
                 "text": final_text,
                 "keywords": f"Obs: {observation} | Åtgärd: {åtgärd} | Effekt: {effekt} | Redigerad: {was_edited}" ,
-                "time_seconds": time_spent
+                "time_seconds": time_spent,
+                "original_text": original,
+                "diff_text": diff_text 
             })
 
             if current_scenario < len(scenarios):
