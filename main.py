@@ -12,8 +12,8 @@ def get_worksheet():
     """ Anslut till Google Sheets - fungerar både lokalt och i Streamlit Cloud"""
     try:
         # För lokal testning (om du har service.account.json i samma mapp)
-        credentials = Credentials.from_service_account_file(
-            "service_account.json",
+        credentials = Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
             scopes = [
                 "https://www.googleapis.com/auth/spreadsheets",
                 "https://www.googleapis.com/auth/drive"
