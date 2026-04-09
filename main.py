@@ -215,7 +215,10 @@ with st.sidebar:
 
         try:
             ws = get_worksheet()
-            all_data = ws.get_all_records()
+            all_data = ws.get_all_records(expected_headers=[
+                "created_at", "type", "participant_id", "scenario", 
+                "category", "text", "keywords", "time_seconds", ""
+            ])
 
             if not all_data:
                 st.info("Ingen data än.")
@@ -264,7 +267,6 @@ with st.sidebar:
                             st.divider()
         except Exception as e:
             st.error(f"Kunde inte hämta data: {e}")
-
 
 
 # --- Startskärm ---
