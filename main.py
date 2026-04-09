@@ -41,8 +41,10 @@ def save_to_sheets(data: dict):
             data.get("text", ""),
             data.get("keywords", ""),
             data.get("time_seconds", 0),
+            data.get("notes", "")
             ""
         ])
+        ws.append_row(row)
     except Exception as e:
         pass # Tyst felhantering för användarupplevelsen
 
@@ -215,11 +217,27 @@ with st.sidebar:
 
         try:
             ws = get_worksheet()
-            all_data = ws.get_all_records()
 
-            if not all_data:
+            # Hämta all data med explicit hantering av headers
+            all_values = ws.get_all_records()
+
+            if len(all_values) < 2:
                 st.info("Ingen data än.")
             else:
+                headers = all_values[0]
+                data_rows = all_values[1:]
+
+                # Skapa Dataframe liknande struktur manuellt
+                all_data = []
+                for row in data_rows:
+                    record = {}
+                    for i, header in enumerate(headers):
+                        if i < len(row):
+                            # Ge tomma headers ett unikt namn
+                            col_name = header.strip() if header.strip() else f"Column_{i+1}"
+                            record[col_name] = row[i]
+                    all_data.append(record)
+
                 # --- Sammanfattning ---
                 ai_rows = [row for row in all_data if row.get("type") == "ai"]
                 manual_rows = [row for row in all_data if row.get("type") == "manual"]
@@ -241,30 +259,34 @@ with st.sidebar:
 
                 # --- Per deltagare ---
                 st.markdown("### Per deltagare")
-                participants = list(set(row.get("participants_id") for row in summary_rows))
+
+                participant_field = "participant_id" if any("participant_id" in row for row in summary_rows) else "participant_id"
+
+                participants = list(set(row.get(participant_field, "Okänd") for row in summary_rows))
 
                 for p in participants:
                     with st.expander(f"Människa {p}"):
 
-                        p_summary = next((r for r in summary_rows if r.get("participant_id") == p), None)
+                        p_summary = next((r for r in summary_rows if r.get(participant_field) == p), None)
                         if p_summary:
                             st.text(p_summary.get("text", ""))
                             st.text(f"SUS: {p_summary.get("keywords", "")}")
 
-                        p_ai = [r for r in ai_rows if r.get("participant_id") == p]
+                        p_ai = [r for r in ai_rows if r.get(participant_field) == p]
                         for row in p_ai:
                             st.markdown(f"**Scenario {row.get("scenario")}**")
                             st.text(f"Kategori: {row.get("category","")}")
                             st.text(f"Text: {row.get("text", "")}")
+                            
                             keywords = row.get("keywords", "")
                             if "Redigerad: True" in keywords:
                                 st.warning("Texten redigerades")
                             else:
                                 st.success("Oförändrad")
                             st.divider()
+
         except Exception as e:
             st.error(f"Kunde inte hämta data: {e}")
-
 
 
 # --- Startskärm ---
