@@ -269,7 +269,7 @@ with st.sidebar:
                 st.divider()
                 st.subheader("AI-genererade texter (med redigering)")
 
-                ai_df = df.iloc[:,1] == "ai".copy() if len(df) > 0 else pd.DataFrame()
+                ai_df = df[df.iloc[:,1] == "ai"].copy() if not df.empty else pd.DataFrame()
 
                 if not ai_df.empty:
                     for idx, row in ai_df.iterrows():
