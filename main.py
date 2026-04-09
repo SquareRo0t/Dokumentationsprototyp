@@ -215,10 +215,7 @@ with st.sidebar:
 
         try:
             ws = get_worksheet()
-            all_data = ws.get_all_records(expected_headers=[
-            "created_at", "type", "participant_id", "scenario", 
-            "category", "text", "keywords", "time_seconds", ""
-            ])
+            all_data = ws.get_all_records()
 
             if not all_data:
                 st.info("Ingen data än.")
