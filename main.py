@@ -206,7 +206,7 @@ def get_scenario_title(scenario_number: int) -> str:
     }
     return titles.get(scenario_number, f"Scenario {scenario_number}")
 
-# --- Admin vy (uppdaterad och robust) ---
+# === ADMIN VY - Robust version ===
 with st.sidebar:
     admin_password = st.text_input("Admin-lösenord", type="password", label_visibility="collapsed")
     
@@ -215,67 +215,63 @@ with st.sidebar:
         
         try:
             ws = get_worksheet()
-            all_values = ws.get_all_values()   # <-- Detta är säkrast
+            all_values = ws.get_all_values()
             
             if len(all_values) <= 1:
-                st.info("Ingen data sparad ännu.")
+                st.info("Ingen data i arket ännu.")
+                st.stop()
+
+            headers = [h.strip().lower() for h in all_values[0]]   # Gör headers case-insensitive
+            data_rows = all_values[1:]
+
+            # Skapa dictionarys
+            all_data = []
+            for row in data_rows:
+                row_padded = row + [""] * (len(headers) - len(row))
+                record = {headers[i]: str(row_padded[i]).strip() for i in range(len(headers))}
+                all_data.append(record)
+
+            # Filtrera (nu case-insensitive)
+            ai_rows = [row for row in all_data if row.get("type", "").lower() == "ai"]
+            manual_rows = [row for row in all_data if row.get("type", "").lower() == "manual"]
+            summary_rows = [row for row in all_data if row.get("type", "").lower() in ("summary", "sus")]
+
+            st.markdown("### Sammanfattning")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Deltagare", len(summary_rows))
+            col2.metric("Manuella svar", len(manual_rows))
+            col3.metric("AI-svar", len(ai_rows))
+
+            edited = sum(1 for row in ai_rows if "redigerad: true" in row.get("keywords", "").lower())
+            st.metric("Redigerade AI-texter", f"{edited} av {len(ai_rows)}")
+
+            st.divider()
+            st.markdown("### Per deltagare")
+
+            # Hitta unika deltagare
+            participants = sorted({row.get("participant_id", "") for row in summary_rows if row.get("participant_id")})
+
+            if not participants:
+                st.info("Inga SUMMARY-rader hittades ännu.")
             else:
-                headers = all_values[0]
-                data_rows = all_values[1:]
-                
-                # Skapa lista med dictionarys
-                all_data = []
-                for row in data_rows:
-                    row_padded = row + [""] * (len(headers) - len(row))
-                    all_data.append(dict(zip(headers, row_padded)))
-
-                # Filtrera rader
-                ai_rows = [row for row in all_data if str(row.get("type", "")).strip() == "ai"]
-                manual_rows = [row for row in all_data if str(row.get("type", "")).strip() == "manual"]
-                summary_rows = [row for row in all_data if str(row.get("type", "")).strip() in ("SUMMARY", "SUS")]
-
-                st.markdown("### Sammanfattning")
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Deltagare", len(summary_rows))
-                col2.metric("Manuella svar", len(manual_rows))
-                col3.metric("AI-svar", len(ai_rows))
-
-                edited_count = sum(1 for row in ai_rows if "Redigerad: True" in str(row.get("keywords", "")))
-                st.metric("Redigerade AI-texter", f"{edited_count} av {len(ai_rows)}")
-                st.divider()
-
-                # Per deltagare
-                st.markdown("### Per deltagare")
-                participants = sorted({str(row.get("participant_id", "")).strip() 
-                                     for row in summary_rows if row.get("participant_id")})
-
                 for p in participants:
-                    if not p:
-                        continue
                     with st.expander(f"👤 {p}"):
-                        # Sammanfattning för deltagaren
-                        p_summary = next((r for r in summary_rows if str(r.get("participant_id", "")).strip() == p), None)
-                        if p_summary:
-                            st.write("**Total tid:**", p_summary.get("text", ""))
-                            st.write("**SUS-poäng:**", p_summary.get("keywords", ""))
-
-                        # Visa alla AI-svar för denna deltagare
-                        p_ai = [r for r in ai_rows if str(r.get("participant_id", "")).strip() == p]
+                        p_ai = [r for r in ai_rows if r.get("participant_id", "") == p]
                         for row in p_ai:
-                            st.markdown(f"**Scenario {row.get('scenario', '?')}**")
+                            scen = row.get("scenario", "?")
+                            st.markdown(f"**Scenario {scen}**")
                             st.caption(f"Kategori: {row.get('category', '')}")
-                            st.text_area("Text", value=row.get("text", ""), height=120, disabled=True)
+                            st.text_area("Journalanteckning", value=row.get("text", ""), height=100, disabled=True)
                             
-                            keywords = str(row.get("keywords", ""))
-                            if "Redigerad: True" in keywords:
-                                st.warning("✅ Texten har redigerats av användaren")
+                            if "redigerad: true" in row.get("keywords", "").lower():
+                                st.warning("Texten har redigerats av användaren")
                             else:
-                                st.success("Oförändrad")
+                                st.success("AI-texten är oförändrad")
                             st.divider()
 
         except Exception as e:
-            st.error(f"⚠️ Kunde inte hämta data från Google Sheets")
-            st.exception(e)   # Visar full felmeddelande så du ser exakt vad som är fel
+            st.error("Kunde inte läsa Google Sheets")
+            st.exception(e)
 
 
 # --- Startskärm ---
