@@ -210,7 +210,7 @@ def get_scenario_title(scenario_number: int) -> str:
 with st.sidebar:
     admin_password = st.text_input("Admin", type="password", label_visibility="collapsed")
 
-    if admin_password == "ditt-lösenord":
+    if admin_password == st.secrets["ADMIN_PASSWORD"]:
         st.title("Admin - Ändringslogg")
 
         try:
