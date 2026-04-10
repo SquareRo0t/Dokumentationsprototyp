@@ -557,7 +557,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
     )
 
     # 2. Generera / Regenerera
-    col1, col2 = st.columns[5,1]
+    col1, col2 = st.columns([5,1])
 
     with col1:
         if st.button("Generera dokumentationstext", type="primary", use_container_width=True,
