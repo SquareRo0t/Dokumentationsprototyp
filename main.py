@@ -556,19 +556,12 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
         height=70
     )
 
-    # 2. Generera / Regenerera
-    col1, col2 = st.columns([5,1])
-
-    event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
-
-    with col1:
-        generate_label = "Regenerera text" if st.session_state.get(f"ai_show_{current_scenario}", False) else "Generera dokumentationstext"
-
-        if st.button("Generera dokumentationstext", type="primary", use_container_width=True,
-                     key=f"gen_btn_{current_scenario}"):
-            if not observation.strip():
-                st.warning("Fyll i observation/nyckelord först")
+    # 2. Generera
+    if st.button("Generera dokumentationstext", type="primary", use_container_width=True):
+        if not observation.strip():
+            st.warning("Fyll i observation/nyckelord först")
         else:
+            event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
             # LLM
             with st.spinner("Genererar journalanteckning med Groq..."):
                 generated = query_groq(
@@ -581,17 +574,8 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
                 st.session_state[f"ai_result_{current_scenario}"] = generated
                 st.session_state[f"ai_result_{current_scenario}_original"] = generated
                 st.session_state[f"ai_show_{current_scenario}"] = True
-                st.rerun()
             else:
                 st.error("Texten uppfyllde inte reglerna. Försök igen.")
-    with col2:
-        if st.session_state.get(f"ai_show_{current_scenario}", False):
-            if st.button("Rensa", key=f"clear_{current_scenario}", help="Rensa och börja om"):
-                for k in [f"ai_result_{current_scenario}",
-                          f"ai_result_{current_scenario}_original",
-                          f"ai_show_{current_scenario}"]:
-                    st.session_state.pop(k, None)
-                st.rerun()
     
     # 3. Journalanteckning (visas efter generering)
     if st.session_state.get(f"ai_show_{current_scenario}", False):
@@ -602,8 +586,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
             "AI-förslag - redigera vid behov",
             value = st.session_state.get(f"ai_result_{current_scenario}", ""),
             key=f"ai_edit_{current_scenario}",
-            height=180,
-            help="Du kan ändra texten hur mycket du vill. Ändringar sparas automatiskt"
+            height=180
         )
         
         # Uppdatera vid ändring
