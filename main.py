@@ -557,6 +557,10 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
     )
 
     # 2. Generera
+    # Räknare för regenerering (säkerställer ny widget-nyckel)
+    if f"regen_count_{current_scenario}" not in st.session_state:
+        st.session_state[f"regen_count_{current_scenario}"] = 0
+
     if st.button("Generera dokumentationstext", type="primary", use_container_width=True):
         if not observation.strip():
             st.warning("Fyll i observation/nyckelord först")
@@ -582,10 +586,11 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
         st.divider()
         st.subheader("2. Journalanteckning")
 
+        regen_count = st.session_state.get(f"regen_count_{current_scenario}", 0)
         edited = st.text_area(
             "AI-förslag - redigera vid behov",
             value = st.session_state.get(f"ai_result_{current_scenario}", ""),
-            key=f"ai_edit_{current_scenario}",
+            key=f"ai_edit_{current_scenario}_{regen_count}",
             height=180
         )
         
@@ -608,6 +613,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
                 if generated:
                     st.session_state[f"ai_result_{current_scenario}"] = generated
                     st.session_state[f"ai_result_{current_scenario}_original"] = generated
+                    st.session_state[f"regen_count_{current_scenario}"] += 1
                     st.rerun()
                 else:
                     st.error("Texten uppfyllde inte reglerna. Försök igen.")
