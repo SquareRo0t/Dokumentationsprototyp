@@ -556,45 +556,26 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
         height=70
     )
 
-    # 2. Generera (uppdaterad med "generera ny version")
-    col1, col2 = st.columns(2)
-
-    with col1:
-        generate_clicked = st.button(
-            "Generera dokumentationstext", 
-            type="primary", 
-            use_container_width=True
-        )
-
-    with col2:
-        regenerate_clicked = st.button(
-            "Generera ny version",
-            use_container_width=True
-        )
-
-    if generate_clicked or regenerate_clicked:
+    # 2. Generera
+    if st.button("Generera dokumentationstext", type="primary", use_container_width=True):
         if not observation.strip():
             st.warning("Fyll i observation/nyckelord först")
         else:
             event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
-
+            # LLM
             with st.spinner("Genererar journalanteckning med Groq..."):
                 generated = query_groq(
                     keywords=f"Observation: {observation}\nÅtgärd: {åtgärd}\nEffekt: {effekt}", 
                     category=category, 
                     scenario_text=scenarios[current_scenario - 1],
                     event_datetime=event_datetime_str
-            )
-
-        if st.session_state.get(f"ai_show_{current_scenario}", False):
-
-            # ⚠️ Spara original ENDAST första gången
-            if f"ai_result_{current_scenario}_original" not in st.session_state:
+                )
+            if generated:
+                st.session_state[f"ai_result_{current_scenario}"] = generated
                 st.session_state[f"ai_result_{current_scenario}_original"] = generated
-
-            st.session_state[f"ai_show_{current_scenario}"] = True
-        else:
-            st.error("Texten uppfyllde inte reglerna. Försök igen.")
+                st.session_state[f"ai_show_{current_scenario}"] = True
+            else:
+                st.error("Texten uppfyllde inte reglerna. Försök igen.")
     
     # 3. Journalanteckning (visas efter generering)
     if st.session_state.get(f"ai_show_{current_scenario}", False):
