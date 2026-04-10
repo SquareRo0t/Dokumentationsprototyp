@@ -559,13 +559,16 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
     # 2. Generera / Regenerera
     col1, col2 = st.columns([5,1])
 
+    event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
+
     with col1:
+        generate_label = "Regenerera text" if st.session_state.get(f"ai_show_{current_scenario}", False) else "Generera dokumentationstext"
+
         if st.button("Generera dokumentationstext", type="primary", use_container_width=True,
                      key=f"gen_btn_{current_scenario}"):
             if not observation.strip():
                 st.warning("Fyll i observation/nyckelord först")
         else:
-            event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
             # LLM
             with st.spinner("Genererar journalanteckning med Groq..."):
                 generated = query_groq(
