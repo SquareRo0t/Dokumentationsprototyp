@@ -592,26 +592,6 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
         # Uppdatera vid ändring
         st.session_state[f"ai_result_{current_scenario}"] = edited
 
-            # Regenereringsknapp
-        if st.button("🔄 Regenerera nytt förslag", use_container_width=True):
-            if not observation.strip():
-                st.warning("Fyll i observation/nyckelord först")
-            else:
-                event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
-                with st.spinner("Genererar nytt förslag..."):
-                    generated = query_groq(
-                        keywords=f"Observation: {observation}\nÅtgärd: {åtgärd}\nEffekt: {effekt}",
-                        category=category,
-                        scenario_text=scenarios[current_scenario - 1],
-                        event_datetime=event_datetime_str
-                    )
-                if generated:
-                    st.session_state[f"ai_result_{current_scenario}"] = generated
-                    # Behåll originalet från första genereringen
-                    st.rerun()
-                else:
-                    st.error("Texten uppfyllde inte reglerna. Försök igen.")
-
     #Knapp för nästa
     if st.button("Godkänn och nästa scenario", type="primary", use_container_width=True):
         final_text = st.session_state.get(f"ai_result_{current_scenario}", "").strip()
