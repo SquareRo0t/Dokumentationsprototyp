@@ -586,9 +586,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
                     event_datetime=event_datetime_str
             )
 
-        if generated:
-            # Uppdatera alltid senaste resultat
-            st.session_state[f"ai_result_{current_scenario}"] = generated
+        if st.session_state.get(f"ai_show_{current_scenario}", False):
 
             # ⚠️ Spara original ENDAST första gången
             if f"ai_result_{current_scenario}_original" not in st.session_state:
