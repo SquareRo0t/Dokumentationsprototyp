@@ -97,28 +97,33 @@ def validate_output(text):
 
 def query_groq(keywords: str, category: str , scenario_text: str, 
                event_datetime: str = None) -> str:
-    # Regel 1: Struktur (hard constraint via prompt)
-
+    # Regel: Struktur (hard constraint via prompt)
     """Genererar professionell journalanteckning med Groq"""
     
     system_prompt ="""
-    Du är en erfaren vårdpersonal inom äldreomsorg med många års erfarenhet av dokumentation.
+    Du är ett dokumentationsstöd för äldreomsorg. Din enda uppgift är att formulera 
+    korrekta journalanteckningar baserat på den information du får.
 
-    FÖLJ ALLTID dess hårda regler när du skriver journalanteckningar:
-    1. Skriv **endast på svenska**.
-    2. Var **objektiv och faktabaserad** - inga värderingar, antaganden eller spekulationer (undvik ord som "tyvärr", "lyckligtvis", "verkade").
-    3. Använd tydlig **IBIC-struktur**: 
-    - Observation: Beskriv fakta om vad som observerades.
-    - Insats/Åtgärd: Beskriv exakt vad som utfördes av personalen.
-    - Effekt: Beskriv resultatet av insatsen (om det är relevant). 
-    4. Var **koncis** - max 4-6 meningar.
-    5. Använd korrekt vårdterminologi men håll språket lättläst.
-    6. Börja alltid med datum och tid för händelsen.
-    7. Avsluta aldrig med rekommendationer om det inte är en "Utförda insatser"-kategori.
+    HÅRDA REGLER - bryt aldrig dessa:
+    1. Skriv ENDAST på svenska.
+    2. Använd IBIC struktur med tydliga rubriker:
+        - Observation: Vad observerades objektivt (fakta inte tolkningar)
+        - Insats/Åtgärd: Vad personalen konkret utförde
+        - Effekt: Mätbart eller observerbart resultat. Utelämna avsnittet om ingen effekt angetts
+    3. Skriv i tredje person om personalen ("Personalen", "Undersköterskan").
+    4. Var strikt objektiv. Inga värderingar, känslor eller spekulationer.
+        Förbjudna ord: tyvärr, lyckligtvis, verkade, kanske, troligen, antar, verkar
+    5. Hitta INTE på information som inte finns i nyckelorden. Om något saknas, utelämna det.
+    6. Max 5 meningar totalt.
+    7. Inga avslutande rekommendationer eller förslag till åtgärder.
 
-    Skriv alltid i **professionell, neutral ton**.
+    Exempel på fel vs rätt:
+    Fel - "Brukaren verkade nöjd och mådde troligen bra efter måltiden"
+    Rätt - "Brukaren uppgav att hen mådde bra efter måltiden"
+
+    Fel - "Det kan vara bra att följa upp blodtrycket framöver"
+    Rätt - (Ingen mening alls - rekommendationer utelämnas)
     """
-
     user_prompt = f"""
     Scenario: {scenario_text}
     Kategori: {category}
@@ -178,11 +183,11 @@ init_session_state()
 if "user_title" not in st.session_state:
     st.session_state.user_title = "" # Standardvärde
 
-# Säkerställ att det alltid finns ett värde
+# --- Säkerställ att det alltid finns ett värde ---
 if not st.session_state.user_title or st.session_state.user_title.strip() == "":
     st.session_state.user_title = ""
 
-# Progress bar
+# --- Progress bar funktion ---
 def show_progress_bar(is_ai=False):
     prefix = "ai_" if is_ai else ""
     current = st.session_state.get(f"{prefix}scenario", 1)
@@ -193,7 +198,7 @@ def show_progress_bar(is_ai=False):
     st.progress(progress, text=f"Scenario {current} av {total} - {get_scenario_title(current)}")
 
 
-# ---Scenarion --- Fixa till så att de blir bättre
+# ---Scenarion ---
 scenarios = [
 """Scenario 1 - Lätt:
 
