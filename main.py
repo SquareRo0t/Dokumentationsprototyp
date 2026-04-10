@@ -592,10 +592,25 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
         # Uppdatera vid ändring
         st.session_state[f"ai_result_{current_scenario}"] = edited
 
-        if not edited.strip(): # Om texten raderats, visa varning och dölj godkänn knappen
+        if not edited.strip():
             st.warning("Texten är raderad. Fyll i nyckelorden ovan och generera en ny text")
-            # Återaktiverar generera knappen
             st.session_state[f"ai_show_{current_scenario}"] = False
+        else:
+            if st.button("🔄 Generera ny text", key=f"regenerate_{current_scenario}"):
+                event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
+                with st.spinner("Genererar nytt förslag..."):
+                    generated = query_groq(
+                        keywords=f"Observation: {observation}\nÅtgärd: {åtgärd}\nEffekt: {effekt}",
+                        category=category,
+                        scenario_text=scenarios[current_scenario - 1],
+                        event_datetime=event_datetime_str
+                    )
+                if generated:
+                    st.session_state[f"ai_result_{current_scenario}"] = generated
+                    st.session_state[f"ai_result_{current_scenario}_original"] = generated
+                    st.rerun()
+                else:
+                    st.error("Texten uppfyllde inte reglerna. Försök igen.")
 
     #Knapp för nästa
     if st.button("Godkänn och nästa scenario", type="primary", use_container_width=True):
