@@ -2,11 +2,11 @@ import streamlit as st
 import time
 import gspread
 import pandas as pd
+import difflib
 
 from datetime import datetime
 from groq import Groq
 from google.oauth2.service_account import Credentials
-
 
 # --- Google Sheets ---
 def get_worksheet():
@@ -66,8 +66,7 @@ def save_to_sheets(data: dict):
         ])
                         
     except Exception as e:
-        pass # Tyst felhantering för användarupplevelsen
-
+        print(f"[SHEETS ERROR] {e}")
 
 # --- Groq ---
 # Säker Groq API-nyckel hantering
@@ -86,18 +85,21 @@ def validate_output(text):
     for word in forbidden_words:
         if word in text.lower():
             return False
+    return True
         
     # Kontroll – minst två av strukturerna ska finnas
-    text_lower = text.lower()
-    required = ["observation", "insats", "åtgärd", "effekt"]
-    matches = sum(1 for word in required if word in text_lower)
-    has_structure = matches >= 2
+    # text_lower = text.lower()
+    # required = ["observation", "insats", "åtgärd", "effekt"]
+    # matches = sum(1 for word in required if word in text_lower)
+    # has_structure = matches >= 2
 
-    return has_structure
+    # return has_structure
 
+# --- Kolla till denna bit imorgon varför utskriften är konstiga ---
 def query_groq(keywords: str, category: str , scenario_text: str, 
                event_datetime: str = None) -> str:
-    # Regel: Struktur (hard constraint via prompt)
+    
+    # Regel 1: Struktur (hard constraint via prompt)
     """Genererar professionell journalanteckning med Groq"""
     
     system_prompt ="""
@@ -134,7 +136,7 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     """
     try:
         response = client.chat.completions.create(
-            model = "meta-llama/llama-4-scout-17b-16e-instruct", # Bra och snabb (Gratis version räcker)
+            model = "meta-llama/llama-4-scout-17b-16e-instruct", # Bäst i test efter att ha testat andra
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -147,7 +149,7 @@ def query_groq(keywords: str, category: str , scenario_text: str,
         return text if validate_output(text) else None
     except Exception as e:
         return None
-    
+# ------------------------------------------------------------------------------------------    
     
 # --- Session state --- 
 def init_session_state():
@@ -178,10 +180,10 @@ def init_session_state():
 
 init_session_state()
 
-
 # --- Anonym signatur ---
 if "user_title" not in st.session_state:
-    st.session_state.user_title = "" # Standardvärde
+    # Standardvärde
+    st.session_state.user_title = ""
 
 # --- Säkerställ att det alltid finns ett värde ---
 if not st.session_state.user_title or st.session_state.user_title.strip() == "":
@@ -197,37 +199,48 @@ def show_progress_bar(is_ai=False):
 
     st.progress(progress, text=f"Scenario {current} av {total} - {get_scenario_title(current)}")
 
+def compute_diff(original: str, final str) -> str:
+    if original.strip() == final.strip():
+        return "Inga ändringar"
+    diff = difflib.unified_diff(
+        original.splitlines(),
+        final.splitlines(),
+        lineterm="",
+        n=0
+    )
+    return "\n".join(list(diff)[2:1])
 
-# ---Scenarion ---
+# ---Scenarion --- kolla till om de kan förbättras för de känns dåliga på något sätt
 scenarios = [
-"""Scenario 1 - Lätt:
+"""Scenario 1
 
 Du har precis hjälpt Britta, 84 år, med hennes morgonrutiner.
 Hon tvättade sig själv till stor del men behövde hjälp med påklädning.
 Hon åt en hel frukost och var i gott humör. Dokumentera insatsen.
 """,
 
-"""Scenario 2 - Medel:
+"""Scenario 2
 
 Du är mitt i ett hektiskt eftermiddagspass. Du har precis hjälpt Erik, 79 år, med sin
 kvällsmedicin och noterat att han verkar mer trött än vanligt. Du har bara några minuter,
 skriv en kort dokumentation med de viktigaste punkterna.
 """,
 
-"""Scenario 3 - Svårast:
+"""Scenario 3
 
 Gunnel, 91 år, vägrade idag ta sin ordinerade blodtrycksmedicin och blev
 upprörd när du försökte hjälpa henne. Detta är tredje gången i veckan.
 Dokumentera avvikelsen noggrant och sakligt. Anteckningen kan komma att granskas.
 """
 ]
+#----------------------------------------------------------------------------------------
 
 def get_scenario_title(scenario_number: int) -> str:
     """Returnerar en kort och tydlig titel för varje scenario"""
     titles = {
-        1: "Lätt: Rutindokumentation efter vårdinsats",
-        2: "Medel: Dokumentation under ett arbetspass",
-        3: "Svår: Dokumentation av avvikelse"
+        1: "Rutindokumentation efter vårdinsats",
+        2: "Dokumentation under ett arbetspass",
+        3: "Dokumentation av avvikelse"
     }
     return titles.get(scenario_number, f"Scenario {scenario_number}")
 
@@ -378,7 +391,6 @@ if not st.session_state.started:
                 st.rerun()
     st.stop()
 
-
 # --- Gemensam timer-logik (osynlig) ---
 def get_current_scenario_time(is_ai=False):
     prefix = "ai_" if is_ai else ""
@@ -391,7 +403,6 @@ def get_current_scenario_time(is_ai=False):
     elapsed = int(time.time() - st.session_state[key][scenario])
     return elapsed, scenario
 
-
 # --- Manuella delen ---
 if st.session_state.started and not st.session_state.finished and not st.session_state.ai_started:
     elapsed, current_scenario = get_current_scenario_time(is_ai=False)
@@ -402,7 +413,7 @@ if st.session_state.started and not st.session_state.finished and not st.session
 
     st.subheader("Händelsedatum och tid")
 
-    # Datum och tid - visas först
+    # Datum och tid
     col1, col2 = st.columns(2)
     with col1:
         event_date = st.date_input(
@@ -422,14 +433,14 @@ if st.session_state.started and not st.session_state.finished and not st.session
     st.caption("Välj den kategori som bäst beskriver händelsen.")
 
     cat = st.selectbox(
-    "Kategori / Rubrik",
+    "Kategori/Rubrik",
     ["Observationer", "Utförda insatser", "Avvikelser eller problem", "Kommunikation"],
     key=f"man_cat_{current_scenario}")
     
     text = st.text_area("Beskrivning av händelse + åtgärd",
                         placeholder="Beskriv vad som hände och vilka åtgärder som vidtogs...", 
                         key=f"manual_text_{current_scenario}",
-                        height=150)
+                        height=200)
 
     if st.button("Nästa scenario", type="primary"):
         if not text.strip(): # TEST
@@ -466,7 +477,6 @@ if st.session_state.started and not st.session_state.finished and not st.session
                 st.session_state.end_time = time.time()
             st.rerun()
 
-
 # --- Övergång till AI ---
 if st.session_state.finished and not st.session_state.ai_started:
     st.success("Manuell del klar!")
@@ -488,7 +498,6 @@ if st.session_state.finished and not st.session_state.ai_started:
         st.rerun()
     st.stop()
     
-
 # --- AI-assisterad del ---
 if st.session_state.ai_started and not st.session_state.ai_finished:
     elapsed, current_scenario = get_current_scenario_time(is_ai=True)
@@ -503,7 +512,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
     # 1. Strukturerad information
     st.subheader("Händelsedatum och tid")
 
-    # Datum och tid - visas först
+    # Datum och tid
     col1, col2 = st.columns(2)
     with col1:
         event_date = st.date_input(
@@ -546,18 +555,17 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
         "Åtgärd / Insats",
         placeholder="Hjälpte till att skära maten, uppmuntrade att äta, serverade extra dryck...",
         key=f"ai_åtgärd_{current_scenario}",
-        height=80
+        height=100
     )
 
     effekt = st.text_area(
         "Effekt / Resultat (valfritt)",
         placeholder="t.ex. Brukaren åt upp halva portionen och verkade nöjd efteråt...",
         key=f"ai_effekt_{current_scenario}",
-        height=70
+        height=100
     )
-
-    # 2. Generera
-    # Räknare för regenerering (säkerställer ny widget-nyckel)
+    
+    # 2. Generera och räknare för regenerering (säkerställer ny widget-nyckel)
     if f"regen_count_{current_scenario}" not in st.session_state:
         st.session_state[f"regen_count_{current_scenario}"] = 0
 
@@ -601,7 +609,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
             st.warning("Texten är raderad. Fyll i nyckelorden ovan och generera en ny text")
             st.session_state[f"ai_show_{current_scenario}"] = False
         else:
-            if st.button("🔄 Generera ny text", key=f"regenerate_{current_scenario}"):
+            if st.button("Generera ny text", key=f"regenerate_{current_scenario}"):
                 event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
                 with st.spinner("Genererar nytt förslag..."):
                     generated = query_groq(
@@ -629,7 +637,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
 
             # Beräkna vad som ändrades
             if was_edited:
-                diff_text = f"ÄND RAD: {final_text}\n\nORIGINAL: {original}"
+                diff_text = compute_diff(original, final_text)
             else:
                 diff_text = "Inga ändringar"
             
@@ -719,24 +727,6 @@ if st.session_state.ai_finished:
             "keywords": f"SUS: {sus_score}",
             "time_seconds": total_manual
         })
-
-        try:
-            ws = get_worksheet()
-            ws.append_row([
-                datetime.now().isoformat(),
-                "SUS",
-                "Testdeltagare",
-                "Sammanfattning",
-                total_manual,
-                total_ai,
-                total_manual - total_ai,
-                sus_score,
-                sus_scores[0], sus_scores[1], sus_scores[2], sus_scores[3], sus_scores[4],
-                sus_scores[5], sus_scores[6], sus_scores[7], sus_scores[8], sus_scores[9]
-            ])
-            st.balloons()
-        except Exception as e:
-            st.error(f"Fel vid sparning av SUS: {e}")
-        
+        st.balloons()
         st.markdown("### Tack för ditt deltagande!")
         st.markdown("Dina svar har sparats. Du kan nu stänga denna sida.")
