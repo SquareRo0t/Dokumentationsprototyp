@@ -199,7 +199,7 @@ def show_progress_bar(is_ai=False):
 
     st.progress(progress, text=f"Scenario {current} av {total} - {get_scenario_title(current)}")
 
-def compute_diff(original: str, final str) -> str:
+def compute_diff(original: str, final: str) -> str:
     if original.strip() == final.strip():
         return "Inga ändringar"
     diff = difflib.unified_diff(
@@ -208,7 +208,7 @@ def compute_diff(original: str, final str) -> str:
         lineterm="",
         n=0
     )
-    return "\n".join(list(diff)[2:1])
+    return "\n".join(list(diff)[2:])
 
 # ---Scenarion --- kolla till om de kan förbättras för de känns dåliga på något sätt
 scenarios = [
