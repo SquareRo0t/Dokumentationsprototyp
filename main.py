@@ -134,7 +134,7 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     """
     try:
         response = client.chat.completions.create(
-            model = "llama-3.3-70b-versatile", # Bra och snabb (Gratis version räcker)
+            model = "meta-llama/llama-4-scout-17b-16e-instruct", # Bra och snabb (Gratis version räcker)
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
