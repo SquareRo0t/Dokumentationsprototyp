@@ -141,13 +141,17 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     Rätt - (Ingen mening alls - rekommendationer utelämnas)
     """
     user_prompt = f"""
-    Scenario: {scenario_text}
-    Kategori: {category}
     Datum och tid för händelsen: {event_datetime}
-    Nyckelord/observationer {keywords}
+    Kategori: {category}
+    
+    Användarens nyckelord (detta är det enda du ska basera anteckningen på):
+    - Observation: {observation}
+    - Åtgärd: {åtgärd}
 
-    Skriv en korrekt journalanteckning enligt reglerna ovan.
+    Skriv en korrekt journalanteckning enligt reglerna. Använd ENDAST informationen ovan.
     """
+    #Scenario: {scenario_text}
+    #Nyckelord/observationer {keywords}
     try:
         response = client.chat.completions.create(
             model = "llama-3.3-70b-versatile", # Bäst presterande modell i test
