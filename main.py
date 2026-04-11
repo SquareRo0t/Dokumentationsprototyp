@@ -540,7 +540,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
     )
     
     observation = st.text_area(
-        "Beskrivning av händelse",
+        "Beskrivning av händelse/Observation",
         placeholder="t.ex. Brukaren fick hjälp med lunch. Brukaren åt ungefär halva portionen...",
         key=f"ai_obs_{current_scenario}",
         height=100
@@ -553,12 +553,12 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
         height=100
     )
 
-    effekt = st.text_area(
-        "Effekt/Resultat (valfritt)",
-        placeholder="t.ex. Brukaren åt upp halva portionen och verkade nöjd efteråt...",
-        key=f"ai_effekt_{current_scenario}",
-        height=100
-    )
+    # effekt = st.text_area(
+    #     "Effekt/Resultat (valfritt)",
+    #     placeholder="t.ex. Brukaren åt upp halva portionen och verkade nöjd efteråt...",
+    #     key=f"ai_effekt_{current_scenario}",
+    #     height=100
+    # )
     
     # 2. Generera och räknare för regenerering (säkerställer ny widget-nyckel)
     if f"regen_count_{current_scenario}" not in st.session_state:
@@ -572,7 +572,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
             # LLM
             with st.spinner("Genererar journalanteckning med Groq..."):
                 generated = query_groq(
-                    keywords=f"Observation: {observation}\nÅtgärd: {åtgärd}\nEffekt: {effekt}", 
+                    keywords=f"Observation: {observation}\nÅtgärd: {åtgärd}", 
                     category=category, 
                     scenario_text=scenarios[current_scenario - 1],
                     event_datetime=event_datetime_str
@@ -608,7 +608,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
                 event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
                 with st.spinner("Genererar nytt förslag..."):
                     generated = query_groq(
-                        keywords=f"Observation: {observation}\nÅtgärd: {åtgärd}\nEffekt: {effekt}",
+                        keywords=f"Observation: {observation}\nÅtgärd: {åtgärd}",
                         category=category,
                         scenario_text=scenarios[current_scenario - 1],
                         event_datetime=event_datetime_str
@@ -649,7 +649,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
                 "scenario": current_scenario,
                 "category": category,
                 "text": final_text,
-                "keywords": f"Obs: {observation} | Åtgärd: {åtgärd} | Effekt: {effekt} | Redigerad: {was_edited}" ,
+                "keywords": f"Obs: {observation} | Åtgärd: {åtgärd} | Redigerad: {was_edited}" ,
                 "time_seconds": time_spent,
                 "original_text": original,
                 "diff_text": diff_text 
