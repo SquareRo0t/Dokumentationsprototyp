@@ -201,7 +201,7 @@ def compute_diff(original: str, final: str) -> str:
     )
     return "\n".join(list(diff)[2:])
 
-# ---Scenarion --- kolla till om de kan förbättras för de känns dåliga på något sätt
+# ---Scenarion ---
 scenarios = [
 """Scenario 1
 
@@ -229,7 +229,6 @@ Du kontaktade ansvarig sjuksköterska per telefon kl. 14:32.
 Dokumentera avvikelsen. Anteckningen kan komma att granskas juridiskt.
 """
 ]
-#----------------------------------------------------------------------------------------
 
 def get_scenario_title(scenario_number: int) -> str:
     """Returnerar en kort och tydlig titel för varje scenario"""
@@ -289,7 +288,7 @@ with st.sidebar:
                     for idx, row in ai_df.iterrows():
                         scenario = row.iloc[3] if len(row) > 3 else ""
                         participant = row.iloc[2] if len(row) > 2 else ""
-                        final_text = row.iloc[5] if len(row) > 5 else ""      # Kolumn för "text"
+                        final_text = row.iloc[5] if len(row) > 5 else ""       # Kolumn för "text"
                         original = row.iloc[8] if len(row) > 8 else ""         # Kolumn för "original_text"
                         diff = row.iloc[9] if len(row) > 9 else ""             # Kolumn för "diff_text"
                         category = row.iloc[4] if len(row) > 4 else ""
@@ -342,10 +341,6 @@ if not st.session_state.started:
     **Bästa upplevelsen får du på en dator eller surfplatta.**
     Denna prototyp fungerar på mobil, men är betydligt smidigare att använda på
     större skärmar
-    
-    **När du går vidare:**
-    Det tar några sekunder att spara ditt svar och ladda nästa scenario.
-    Vänligen vänta tills nästa visas.
     """)
 
     st.info("""
@@ -439,13 +434,14 @@ if st.session_state.started and not st.session_state.finished and not st.session
                         height=200)
 
     if st.button("Nästa scenario", type="primary"):
-        if not text.strip(): # TEST
+        if not text.strip():
             st.warning("Skriv något i textfältet innan du går vidare.")
         else:
             event_datetime = datetime.combine(event_date, event_time)
             event_datetime_str = event_datetime.strftime("%Y-%m-%d %H:%M")
 
             time_spent = elapsed
+           
             # Spara svar
             st.session_state.manual_answers[current_scenario] = {
             "category": cat, 
@@ -553,13 +549,6 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
         key=f"ai_åtgärd_{current_scenario}",
         height=100
     )
-
-    # effekt = st.text_area(
-    #     "Effekt/Resultat (valfritt)",
-    #     placeholder="t.ex. Brukaren åt upp halva portionen och verkade nöjd efteråt...",
-    #     key=f"ai_effekt_{current_scenario}",
-    #     height=100
-    # )
     
     # 2. Generera och räknare för regenerering (säkerställer ny widget-nyckel)
     if f"regen_count_{current_scenario}" not in st.session_state:
@@ -567,7 +556,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
 
     if st.button("Generera dokumentationstext", type="primary", use_container_width=True):
         if not observation.strip():
-            st.warning("Fyll i Beskrivning av händelse/nyckelord först")
+            st.warning("Fyll i beskrivning av händelse/nyckelord först")
         else:
             event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
             # LLM
@@ -721,8 +710,27 @@ if st.session_state.ai_finished:
             "category": "",
             "text": f"Manuell: {total_manual}s | AI: {total_ai}s | Skillnad: {total_manual-total_ai}s",
             "keywords": f"SUS: {sus_score}",
-            "time_seconds": total_manual
+            "time_seconds": total_manual,
         })
+
+        try:
+            ws = get_worksheet()
+            ws.append_row([
+                datetime.now().isoformat(),
+                "SUS",
+                "Testdeltagare",
+                "Sammanfattning",
+                total_manual,
+                total_ai,
+                total_manual - total_ai,
+                sus_score,
+                sus_scores[0], sus_scores[1], sus_scores[2], sus_scores[3], sus_scores[4],
+                sus_scores[5], sus_scores[6], sus_scores[7], sus_scores[8], sus_scores[9]
+            ])
+            st.balloons()
+        except Exception as e:
+            st.error(f"Fel vid sparning av SUS: {e}")
+
         st.balloons()
         st.markdown("### Tack för ditt deltagande!")
         st.markdown("Dina svar har sparats. Du kan nu stänga denna sida.")
