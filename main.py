@@ -168,6 +168,7 @@ def query_groq(keywords: str, category: str , scenario_text: str,
 
 def init_session_state():
     defaults = {
+        
             # Manuellt
             "started": False,               # Har användaren startat övningen?
             "start_time": None,             # Tidstämpel när manuell del startade
