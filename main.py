@@ -8,10 +8,12 @@ from datetime import datetime
 from groq import Groq
 from google.oauth2.service_account import Credentials
 
-# --- Google Sheets ---
+
+# --- GOOGLE SHEETS - KOPPLING OCH DATASPARING ---
 def get_worksheet():
     """ Anslut till Google Sheets - fungerar både lokalt och i Streamlit Cloud"""
     try:
+        # Hämta autentiseringsuppgifter från Streamlit Secrets
         credentials = Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
             scopes = [
@@ -19,6 +21,8 @@ def get_worksheet():
                 "https://www.googleapis.com/auth/drive"
             ]
         )
+
+        # Auktorisera klienten och öppna det namngivna kalkylbladet
         client = gspread.authorize(credentials)
         sheet = client.open("Dokumentationsprototyp - Svar")
         worksheet = sheet.worksheet("Sheet1")
@@ -30,11 +34,12 @@ def get_worksheet():
         st.error(f"Kan inte ansluta till Google Sheets: {e}")
         st.stop()
 
+
 def save_to_sheets(data: dict):
     """Spara data till Google Sheets"""
     try:
         ws = get_worksheet()
-        # För AI svar sparar vi extra kolumner
+        # AI-rader inkluderar original AI-förslag och eventuell diff
         if data.get("type") == "ai":
             ws.append_row([
                 data.get("created_at"),
@@ -45,11 +50,11 @@ def save_to_sheets(data: dict):
                 data.get("text", ""),
                 data.get("keywords", ""),
                 data.get("time_seconds", 0),
-                data.get("original_text", ""),
-                data.get("diff_text", "")
+                data.get("original_text", ""),  # AI:s ursprungliga förslag
+                data.get("diff_text", "")       # Vad testaren ändrade
         ])
         else:
-            # Vanlig manual eller Summary
+             # Manuella rader och SUMMARY-rader har inga diff-kolumner
             ws.append_row([
                 data.get("created_at"),
                 data.get("type"),
@@ -59,13 +64,17 @@ def save_to_sheets(data: dict):
                 data.get("text", ""),
                 data.get("keywords", ""),
                 data.get("time_seconds", 0),
-                "",
-                ""
+                "", # Tomt: original_text
+                ""  # Tomt: diff_text
         ])                   
     except Exception as e:
+        # Logga felet utan att krascha appen
         print(f"[SHEETS ERROR] {e}")
 
-# --- Groq ---
+
+# --- GROQ API - KONFIGURATION OCH TEXTGENERERING ---
+
+
 # Säker Groq API-nyckel hantering
 if "GROQ_API_KEY" in st.secrets:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -77,15 +86,20 @@ else:
 
 client = Groq(api_key=GROQ_API_KEY)
 
-# --- Ord som inte får användas ---
-def validate_output(text):
+
+def validate_output(text: str) -> bool:
+    """
+    Kontrollerar att den genererade texten inte innehåller förbjudna ord
+    som kan signalera spekulation, värdering eller bristande objektivitet.
+    
+    Returnerar True om texten godkänns, annars False.
+    """
     forbidden_words = ["kanske", "troligen", "verkar", "antar", "tyvärr", "lyckligvis"] 
     for word in forbidden_words:
         if word in text.lower():
             return False
     return True
 
-# --- Kolla till denna bit imorgon varför utskriften är konstiga ---
 def query_groq(keywords: str, category: str , scenario_text: str, 
                event_datetime: str = None) -> str:
     
@@ -127,30 +141,30 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     """
     try:
         response = client.chat.completions.create(
-            model = "llama-3.3-70b-versatile", # Bäst i test efter att ha testat andra
+            model = "llama-3.3-70b-versatile", # Bäst presterande modell i test
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.3,
-            max_tokens=300,
-            top_p=0.9
+            temperature=0.3, # Låg temperatur för mer konsekvent och faktabaserad output
+            max_tokens=300,  # Begränsar svarslängden
+            top_p=0.9        # Nucleus sampling för viss variation utan att tappa precision
         )
         text = response.choices[0].message.content.strip()
         return text if validate_output(text) else None
     except Exception as e:
-        return None
-# ------------------------------------------------------------------------------------------    
+        return None   
     
-# --- Session state --- 
+# --- SESSION STATE - INITIERING --- 
+
 def init_session_state():
     defaults = {
             # Manuellt
-            "started": False, 
-            "start_time": None, 
-            "scenario": 1, 
-            "finished": False,
-            "manual_answers": {}, 
+            "started": False,               # Har användaren startat övningen?
+            "start_time": None,             # Tidstämpel när manuell del startade
+            "scenario": 1,                  # Aktuellt scenario (1–3)
+            "finished": False,              # Är manuell del klar?
+            "manual_answers": {},           # Sparade svar per scenario  
             "scenario_start_times": {}, 
             "scenario_times": {},
             
@@ -162,7 +176,7 @@ def init_session_state():
             "ai_answers": {}, 
             "ai_scenario_start_times": {},
             "ai_scenario_times": {}, 
-            "participant_id": None
+            "participant_id": None          # Används ej aktivt, men reserverad för framtida behov
     }
 
     for key, value in defaults.items():
@@ -171,26 +185,35 @@ def init_session_state():
 
 init_session_state()
 
-# --- Anonym signatur ---
+# Säkerställ att yrkesroll alltid är en sträng (aldrig None)
 if "user_title" not in st.session_state:
-    # Standardvärde
     st.session_state.user_title = ""
 
-# --- Säkerställ att det alltid finns ett värde ---
 if not st.session_state.user_title or st.session_state.user_title.strip() == "":
     st.session_state.user_title = ""
 
-# --- Progress bar funktion ---
+
+# --- # HJÄLPFUNKTIONER ---
+
+    """
+    Visar en progressbar som indikerar hur långt användaren kommit
+    i scenarierna. Hanterar både manuell och AI-assisterad del.
+    """
 def show_progress_bar(is_ai=False):
     prefix = "ai_" if is_ai else ""
     current = st.session_state.get(f"{prefix}scenario", 1)
     total = len(scenarios)
-
     progress = current / total
-
     st.progress(progress, text=f"Scenario {current} av {total} - {get_scenario_title(current)}")
 
+
 def compute_diff(original: str, final: str) -> str:
+    """
+    Beräknar och returnerar en unified diff-sträng som visar
+    vad användaren ändrade i AI-förslaget.
+    
+    Returnerar 'Inga ändringar' om texterna är identiska.
+    """
     if original.strip() == final.strip():
         return "Inga ändringar"
     diff = difflib.unified_diff(
@@ -201,7 +224,30 @@ def compute_diff(original: str, final: str) -> str:
     )
     return "\n".join(list(diff)[2:])
 
-# ---Scenarion ---
+
+def get_current_scenario_time(is_ai=False):
+    """
+    Beräknar hur lång tid (sekunder) som spenderats på aktuellt scenario.
+    Initierar tidstämpeln om det är första gången scenariot öppnas.
+ 
+    Returnerar:
+        tuple: (elapsed_seconds, current_scenario_number)
+    """
+    prefix = "ai_" if is_ai else ""
+    key = f"{prefix}scenario_start_times"
+    scenario = st.session_state[f"{prefix}scenario"]
+
+    # Sätt starttid om scenariot öppnas för första gången
+    if scenario not in st.session_state[key]:
+        st.session_state[key][scenario] = time.time()
+    
+    elapsed = int(time.time() - st.session_state[key][scenario])
+    return elapsed, scenario
+
+
+# ---SCENARION - INNEHÅLL OCH TITLAR ---
+
+# Lista med de tre scenariotexterna som visas för användarna
 scenarios = [
 """Scenario 1
 
@@ -239,7 +285,9 @@ def get_scenario_title(scenario_number: int) -> str:
     }
     return titles.get(scenario_number, f"Scenario {scenario_number}")
 
-# --- Admin vy ---
+
+# --- ADMIN-VY (SIDOPANEL) ---
+
 with st.sidebar:
     admin_password = st.text_input("Admin", type="password", label_visibility="collapsed")
 
@@ -256,29 +304,29 @@ with st.sidebar:
                 headers = all_values[0]
                 data_rows = all_values[1:]
 
-                # Skapa Dataframe
+                 # Bygg DataFrame från kalkylbladsdata
                 df = pd.DataFrame(data_rows, columns=headers)
 
-                # Rensa eventuella tomma kolumner
+                 # Ta bort eventuella namnlösa kolumner
                 df = df.loc[:, df.columns.notna() & (df.columns != "")]
 
                 st.success(f"Totalt {len(df)} rader hämtade")
 
-                # Filter
+                 # Filtrera på radtyp (manual / ai / SUMMARY)
                 typ_filter = st.selectbox("Visa typ", ["Alla", "manual", "ai", "SUMMARY"])
                 if typ_filter != "Alla":
                     df_filtered = df[df.iloc[:,1] == typ_filter]
                 else:
                     df_filtered = df
 
-                # Visa tabell
+                 # Visa hela tabellen
                 st.dataframe(
                     df,
                     use_container_width=True,
                     hide_index=True
                 )
 
-                # Separata sektioner för AI-svar
+                # --- Detaljvy för AI-svar med jämförelse ---
                 st.divider()
                 st.subheader("AI-genererade texter (med redigering)")
 
@@ -286,6 +334,7 @@ with st.sidebar:
 
                 if not ai_df.empty:
                     for idx, row in ai_df.iterrows():
+                        # Extrahera kolumnvärden med fallback om kolumner saknas
                         scenario = row.iloc[3] if len(row) > 3 else ""
                         participant = row.iloc[2] if len(row) > 2 else ""
                         final_text = row.iloc[5] if len(row) > 5 else ""       # Kolumn för "text"
@@ -305,6 +354,7 @@ with st.sidebar:
                                 st.markdown("**Slutlig text efter redigering:**")
                                 st.text_area("Redigerad", value=final_text, height=140, disabled=True, key=f"edit_{idx}")
                             
+                             # Visa ändringsvarning och diff om texten modifierats
                             if original.strip() != final_text.strip() and original.strip() != "":
                                 st.warning("**Testaren har ändrat texten**")
                                 st.markdown("**Skillnad:**")
@@ -316,7 +366,7 @@ with st.sidebar:
                 else:
                     st.info("Inga AI-svar har sparats ännu.")
                 
-                # Sus sammanfattning
+                # SUS-sammanfattning 
                 st.divider()
                 summary_df = df[df.iloc[:,1] == "SUMMARY"]
                 if not summary_df.empty:
@@ -327,7 +377,8 @@ with st.sidebar:
             st.error(f"Kunde inte hämta data från Google Sheets: {e}")
 
 
-# --- Startskärm ---
+# --- STARTSKÄRM - SAMTYCKE OCH YRKESROLL ---
+
 if not st.session_state.started:
     st.title("AI-baserat dokumentationsstöd för äldreomsorg (Prototyp)")
 
@@ -351,6 +402,7 @@ if not st.session_state.started:
     - Du kan avbryta när som helst.
     """)
 
+    # Samtyckesbockning — måste kryssas i för att fortsätta
     consent = st.checkbox("Jag förstår och godkänner ovanstående")
 
     st.subheader("Instruktion")
@@ -360,7 +412,7 @@ if not st.session_state.started:
     2. **Med AI-hjälp** - efteråt
     """)
 
-    # Endast yrkesroll
+    # Yrkesroll används som anonym identifierare i kalkylbladet
     user_title = st.text_input(
         "**Din yrkesroll/titel**",
         value=st.session_state.get("user_title", "Undersköterska"),
@@ -382,19 +434,9 @@ if not st.session_state.started:
                 st.rerun()
     st.stop()
 
-# --- Gemensam timer-logik (osynlig) ---
-def get_current_scenario_time(is_ai=False):
-    prefix = "ai_" if is_ai else ""
-    key = f"{prefix}scenario_start_times"
-    scenario = st.session_state[f"{prefix}scenario"]
 
-    if scenario not in st.session_state[key]:
-        st.session_state[key][scenario] = time.time()
-    
-    elapsed = int(time.time() - st.session_state[key][scenario])
-    return elapsed, scenario
+# --- MANUELL DEL - SCENARIO-FORMULÄR ---
 
-# --- Manuella delen ---
 if st.session_state.started and not st.session_state.finished and not st.session_state.ai_started:
     elapsed, current_scenario = get_current_scenario_time(is_ai=False)
 
@@ -404,7 +446,7 @@ if st.session_state.started and not st.session_state.finished and not st.session
 
     st.subheader("Händelsedatum och tid")
 
-    # Datum och tid
+    # Datum och tidsinmatning i två kolumner
     col1, col2 = st.columns(2)
     with col1:
         event_date = st.date_input(
@@ -420,18 +462,19 @@ if st.session_state.started and not st.session_state.finished and not st.session
         )
 
     st.subheader("Manuell dokumentation")
-
     st.caption("Välj den kategori som bäst beskriver händelsen.")
 
     cat = st.selectbox(
-    "Kategori/Rubrik",
-    ["Utförda insatser", "Avvikelser eller problem", "Kommunikation"],
-    key=f"man_cat_{current_scenario}")
+        "Kategori/Rubrik",
+        ["Utförda insatser", "Avvikelser eller problem", "Kommunikation"],
+        key=f"man_cat_{current_scenario}"
+    )
     
     text = st.text_area("Beskrivning av händelse + åtgärd",
                         placeholder="Beskriv vad som hände och vilka åtgärder som vidtogs...", 
                         key=f"manual_text_{current_scenario}",
-                        height=200)
+                        height=200
+    )
 
     if st.button("Nästa scenario", type="primary"):
         if not text.strip():
@@ -442,15 +485,15 @@ if st.session_state.started and not st.session_state.finished and not st.session
 
             time_spent = elapsed
            
-            # Spara svar
+            # Spara svaret lokalt i session state
             st.session_state.manual_answers[current_scenario] = {
-            "category": cat, 
-            "text": text.strip(),
-            "event_datetime": event_datetime_str
+                "category": cat, 
+                "text": text.strip(),
+                "event_datetime": event_datetime_str
             }
             st.session_state.scenario_times[current_scenario] = time_spent
 
-           # Spara till Google Sheets
+           # Spara svaret i Google Sheets
             save_to_sheets({
                 "created_at": datetime.now().isoformat(),
                 "type": "manual",
@@ -462,6 +505,7 @@ if st.session_state.started and not st.session_state.finished and not st.session
                 "time_seconds": time_spent
             })
 
+            # Gå till nästa scenario eller markera manuell del som klar
             if current_scenario < len(scenarios):
                 st.session_state.scenario +=1
             else:
@@ -469,7 +513,9 @@ if st.session_state.started and not st.session_state.finished and not st.session
                 st.session_state.end_time = time.time()
             st.rerun()
 
-# --- Övergång till AI ---
+
+# --- ÖVERGÅNGSSKÄRM - MANUELL DEL KLAR ---
+
 if st.session_state.finished and not st.session_state.ai_started:
     st.success("Manuell del klar!")
     st.markdown("""
@@ -490,21 +536,19 @@ if st.session_state.finished and not st.session_state.ai_started:
         st.rerun()
     st.stop()
     
-# --- AI-assisterad del ---
+# --- AI-ASSISTERAD DEL - SCENARIO-FORMULÄR MED TEXTGENERERING ---
+
 if st.session_state.ai_started and not st.session_state.ai_finished:
     elapsed, current_scenario = get_current_scenario_time(is_ai=True)
 
-    # Visa de olika scenario
     st.subheader(f"Scenario {current_scenario} - {get_scenario_title(current_scenario)}")
     show_progress_bar(is_ai=True)
     st.markdown(scenarios[current_scenario - 1])
 
     st.divider()
 
-    # 1. Strukturerad information
     st.subheader("Händelsedatum och tid")
 
-    # Datum och tid
     col1, col2 = st.columns(2)
     with col1:
         event_date = st.date_input(
@@ -521,6 +565,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
 
     st.subheader("AI-assisterad dokumentation")
 
+    # Förval av kategori per scenario baserat på scenariets natur
     scenario_categories = {
         1: "Utförda insatser",
         2: "Utförda insatser",
@@ -536,6 +581,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
         key=f"ai_cat_{current_scenario}"
     )
     
+    # Separata fält för observation och åtgärd för tydligare struktur
     observation = st.text_area(
         "Beskrivning av händelse/Observation",
         placeholder="t.ex. Brukaren fick hjälp med lunch. Brukaren åt ungefär halva portionen...",
@@ -550,15 +596,18 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
         height=100
     )
     
-    # 2. Generera och räknare för regenerering (säkerställer ny widget-nyckel)
+    # Räknare för regenerering används för att tvinga fram ny widget-nyckel
+    # och undvika att Streamlit cachar det gamla textvärdet
     if f"regen_count_{current_scenario}" not in st.session_state:
         st.session_state[f"regen_count_{current_scenario}"] = 0
 
+     # Knapp: Generera förstaförslag
     if st.button("Generera dokumentationstext", type="primary", use_container_width=True):
         if not observation.strip():
             st.warning("Fyll i beskrivning av händelse/nyckelord först")
         else:
             event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
+            
             # LLM
             with st.spinner("Genererar journalanteckning med Groq..."):
                 generated = query_groq(
@@ -567,19 +616,25 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
                     scenario_text=scenarios[current_scenario - 1],
                     event_datetime=event_datetime_str
                 )
+
             if generated:
+                # Spara både redigerbar version och original för diff-beräkning
                 st.session_state[f"ai_result_{current_scenario}"] = generated
                 st.session_state[f"ai_result_{current_scenario}_original"] = generated
+                
                 st.session_state[f"ai_show_{current_scenario}"] = True
             else:
                 st.error("Texten uppfyllde inte reglerna. Försök igen.")
     
-    # 3. Journalanteckning (visas efter generering)
+    # Sektion: Visa och redigera AI-förslaget
     if st.session_state.get(f"ai_show_{current_scenario}", False):
         st.divider()
         st.subheader("2. Journalanteckning")
 
         regen_count = st.session_state.get(f"regen_count_{current_scenario}", 0)
+        
+        # Textfält för granskning och redigering; regen_count ingår i nyckeln
+        # för att återskapa widgeten när nytt förslag genereras
         edited = st.text_area(
             "AI-förslag - redigera vid behov",
             value = st.session_state.get(f"ai_result_{current_scenario}", ""),
@@ -587,7 +642,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
             height=200
         )
         
-        # Uppdatera vid ändring
+        # Synkronisera redigerat värde till session state
         st.session_state[f"ai_result_{current_scenario}"] = edited
 
         if not edited.strip():
@@ -606,21 +661,24 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
                 if generated:
                     st.session_state[f"ai_result_{current_scenario}"] = generated
                     st.session_state[f"ai_result_{current_scenario}_original"] = generated
+
+                    # Öka räknaren för att tvinga fram ny widget-instans
                     st.session_state[f"regen_count_{current_scenario}"] += 1
                     st.rerun()
                 else:
                     st.error("Texten uppfyllde inte reglerna. Försök igen.")
 
-    #Knapp för nästa
+    # Knapp: Godkänn och gå vidare
     if st.button("Godkänn och nästa scenario", type="primary", use_container_width=True):
         final_text = st.session_state.get(f"ai_result_{current_scenario}", "").strip()
+        
         if not final_text:
             st.warning("Generera och/eller redigera texten först")
         else:
             original = st.session_state.get(f"ai_result_{current_scenario}_original", "")
-            was_edited = original.strip() != final_text #  <- Jämför
+            was_edited = original.strip() != final_text # True om användaren ändrat något
 
-            # Beräkna vad som ändrades
+            # Beräkna vad som ändrades jämfört med AI-originalet
             if was_edited:
                 diff_text = compute_diff(original, final_text)
             else:
@@ -631,7 +689,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
             st.session_state.ai_answers[current_scenario] = final_text
             st.session_state.ai_scenario_times[current_scenario] = elapsed
 
-            # Spara till Google Sheets
+            # Spara till Google Sheets med original och diff för analysändamål
             save_to_sheets({
                 "created_at": datetime.now().isoformat(),
                 "type": "ai",
@@ -645,6 +703,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
                 "diff_text": diff_text 
             })
 
+            # Gå till nästa scenario eller markera AI-delen som klar
             if current_scenario < len(scenarios):
                 st.session_state.ai_scenario +=1
             else:
@@ -653,7 +712,8 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
             st.rerun()
 
 
-# --- Slutresultat och SUS ---
+# --- AVSLUTNING - SUS-ENKÄT OCH TACK-SIDA ---
+
 if st.session_state.ai_finished:
     total_ai = int(st.session_state.ai_end_time - st.session_state.ai_start_time)
     total_manual = int(st.session_state.end_time - st.session_state.start_time)
@@ -664,7 +724,7 @@ if st.session_state.ai_finished:
     st.markdown("---")
     st.subheader("Hur upplevde du AI-assisterad dokumentation?")
 
-    # --- SUS enkät ---
+    # --- SUS (System Usability Scale) - standardiserat användbarhetstest ---
     st.markdown("### System Usability Scale (SUS)")
     st.caption("Svara på följande 10 påståenden utifrån hur du upplevde **AI-assisterande delen**")
 
