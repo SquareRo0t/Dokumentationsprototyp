@@ -12,7 +12,6 @@ from google.oauth2.service_account import Credentials
 def get_worksheet():
     """ Anslut till Google Sheets - fungerar både lokalt och i Streamlit Cloud"""
     try:
-        # För lokal testning (om du har service.account.json i samma mapp)
         credentials = Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
             scopes = [
@@ -35,7 +34,6 @@ def save_to_sheets(data: dict):
     """Spara data till Google Sheets"""
     try:
         ws = get_worksheet()
-
         # För AI svar sparar vi extra kolumner
         if data.get("type") == "ai":
             ws.append_row([
@@ -63,8 +61,7 @@ def save_to_sheets(data: dict):
                 data.get("time_seconds", 0),
                 "",
                 ""
-        ])
-                        
+        ])                   
     except Exception as e:
         print(f"[SHEETS ERROR] {e}")
 
@@ -80,20 +77,13 @@ else:
 
 client = Groq(api_key=GROQ_API_KEY)
 
+# --- Ord som inte får användas ---
 def validate_output(text):
     forbidden_words = ["kanske", "troligen", "verkar", "antar", "tyvärr", "lyckligvis"] 
     for word in forbidden_words:
         if word in text.lower():
             return False
     return True
-        
-    # Kontroll – minst två av strukturerna ska finnas
-    # text_lower = text.lower()
-    # required = ["observation", "insats", "åtgärd", "effekt"]
-    # matches = sum(1 for word in required if word in text_lower)
-    # has_structure = matches >= 2
-
-    # return has_structure
 
 # --- Kolla till denna bit imorgon varför utskriften är konstiga ---
 def query_groq(keywords: str, category: str , scenario_text: str, 
@@ -136,7 +126,7 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     """
     try:
         response = client.chat.completions.create(
-            model = "meta-llama/llama-4-scout-17b-16e-instruct", # Bäst i test efter att ha testat andra
+            model = "llama-3.3-70b-versatile", # Bäst i test efter att ha testat andra
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -214,23 +204,28 @@ def compute_diff(original: str, final: str) -> str:
 scenarios = [
 """Scenario 1
 
-Du har precis hjälpt Britta, 84 år, med hennes morgonrutiner.
-Hon tvättade sig själv till stor del men behövde hjälp med påklädning.
-Hon åt en hel frukost och var i gott humör. Dokumentera insatsen.
+Du har precis avslutat Brittas, 84 år, morgonstund.
+Hon klarade personlig hygien självständigt men behövde assistans vid påklädning på grund av stelhet i händerna.
+Hon åt hela frukosten men klagade på ont i vänster knä vid förflyttning.
+Dokumentera insatsen.
 """,
 
 """Scenario 2
 
-Du är mitt i ett hektiskt eftermiddagspass. Du har precis hjälpt Erik, 79 år, med sin
-kvällsmedicin och noterat att han verkar mer trött än vanligt. Du har bara några minuter,
-skriv en kort dokumentation med de viktigaste punkterna.
+Du är mitt i ett hektiskt eftermiddagspass. Du har precis gett Erik, 79 år,
+sin ordinerade kvällsmedicin. Han uppger att han känner
+sig ovanligt trött och har svårt att hålla ögonen öppna, trots att han sovit
+under dagen. Du noterar att han rör sig långsammare än vanligt.
+Du har bara några minuter — dokumentera det viktigaste.
 """,
 
 """Scenario 3
 
-Gunnel, 91 år, vägrade idag ta sin ordinerade blodtrycksmedicin och blev
-upprörd när du försökte hjälpa henne. Detta är tredje gången i veckan.
-Dokumentera avvikelsen noggrant och sakligt. Anteckningen kan komma att granskas.
+Gunnel, 91 år, vägrade för tredje gången denna vecka att ta sin ordinerade
+blodtrycksmedicin. Hon uppgav att "tabletterna gör mig illamående".
+Vid ditt försök att förklara vikten av medicinen blev hon upprörd och bad dig lämna rummet.
+Du kontaktade ansvarig sjuksköterska per telefon kl. 14:32.
+Dokumentera avvikelsen. Anteckningen kan komma att granskas juridiskt.
 """
 ]
 #----------------------------------------------------------------------------------------
@@ -270,7 +265,7 @@ with st.sidebar:
                 st.success(f"Totalt {len(df)} rader hämtade")
 
                 # Filter
-                typ_filter = st.selectbox("Visa typ", ["Alla", "manual", "ai", "Summary"])
+                typ_filter = st.selectbox("Visa typ", ["Alla", "manual", "ai", "SUMMARY"])
                 if typ_filter != "Alla":
                     df_filtered = df[df.iloc[:,1] == typ_filter]
                 else:
@@ -323,7 +318,7 @@ with st.sidebar:
                 
                 # Sus sammanfattning
                 st.divider()
-                summary_df = df[df.iloc[:,1] == "Summary"]
+                summary_df = df[df.iloc[:,1] == "SUMMARY"]
                 if not summary_df.empty:
                     st.subheader("SUS resultat och tid")
                     st.dataframe(summary_df[["participant_id", "text", "keywords"]], use_container_width=True)
@@ -371,7 +366,7 @@ if not st.session_state.started:
 
     # Endast yrkesroll
     user_title = st.text_input(
-        "**Din yrkesroll / titel**",
+        "**Din yrkesroll/titel**",
         value=st.session_state.get("user_title", "Undersköterska"),
         placeholder="t.ex. Undersköterska, Sjuksköterska, Vårdbiträde",
         help="Endast din yrkesroll används för signering. Appen är anonym."
@@ -434,7 +429,7 @@ if st.session_state.started and not st.session_state.finished and not st.session
 
     cat = st.selectbox(
     "Kategori/Rubrik",
-    ["Observationer", "Utförda insatser", "Avvikelser eller problem", "Kommunikation"],
+    ["Utförda insatser", "Avvikelser eller problem", "Kommunikation"],
     key=f"man_cat_{current_scenario}")
     
     text = st.text_area("Beskrivning av händelse + åtgärd",
@@ -545,21 +540,21 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
     )
     
     observation = st.text_area(
-        "Observation",
-        placeholder="t.ex. Brukaren fick hjälp med lunch. Brukaren åt ungefär halva portionen",
+        "Beskrivning av händelse",
+        placeholder="t.ex. Brukaren fick hjälp med lunch. Brukaren åt ungefär halva portionen...",
         key=f"ai_obs_{current_scenario}",
         height=100
     )
 
     åtgärd = st.text_area(
-        "Åtgärd / Insats",
-        placeholder="Hjälpte till att skära maten, uppmuntrade att äta, serverade extra dryck...",
+        "Åtgärd/Insats",
+        placeholder="t.ex. Hjälpte till att skära maten, uppmuntrade att äta, serverade extra dryck...",
         key=f"ai_åtgärd_{current_scenario}",
         height=100
     )
 
     effekt = st.text_area(
-        "Effekt / Resultat (valfritt)",
+        "Effekt/Resultat (valfritt)",
         placeholder="t.ex. Brukaren åt upp halva portionen och verkade nöjd efteråt...",
         key=f"ai_effekt_{current_scenario}",
         height=100
@@ -571,7 +566,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
 
     if st.button("Generera dokumentationstext", type="primary", use_container_width=True):
         if not observation.strip():
-            st.warning("Fyll i observation/nyckelord först")
+            st.warning("Fyll i Beskrivning av händelse/nyckelord först")
         else:
             event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
             # LLM
@@ -599,7 +594,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
             "AI-förslag - redigera vid behov",
             value = st.session_state.get(f"ai_result_{current_scenario}", ""),
             key=f"ai_edit_{current_scenario}_{regen_count}",
-            height=180
+            height=200
         )
         
         # Uppdatera vid ändring
