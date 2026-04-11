@@ -120,12 +120,10 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     4. Använd ALDRIG brukarens namn. Ersätt alltid med "Brukaren".
     5. Var strikt objektiv. Inga värderingar eller spekulationer.
         Förbjudna ord: tyvärr, lyckligtvis, verkade, kanske, troligen, antar, verkar
-        
-        Om användaren anger ett känslotillstånd (t.ex. "ledsen", "upprörd", "glad")
+
+        Om användaren anger ett känslotillstånd
         Skriv INTE bort det — formulera om det som en observation:
-        - "ledsen" → "Brukaren uppvisade tecken på nedstämdhet"
-        - "upprörd" → "Brukaren uppvisade ett upprörd beteende"
-        - "glad" → "Brukaren uppvisade ett positivt sinnesstämning"
+
     6. Basera anteckningen UTESLUTANDE på nyckelorden i användarens input.
     Scenariotexten är ENBART bakgrundsinformation för kontext — kopiera
     aldrig meningar eller detaljer därifrån som användaren inte nämnt.
