@@ -118,11 +118,18 @@ def query_groq(keywords: str, category: str , scenario_text: str,
         - Effekt: Mätbart eller observerbart resultat - om ingen effekt angetts, utelämna hela avsnittet helt och skriv ingenting
     3. Skriv i tredje person om personalen ("Personalen", "Undersköterskan").
     4. Använd ALDRIG brukarens namn. Ersätt alltid med "Brukaren".
-    5. Var strikt objektiv. Inga värderingar, känslor eller spekulationer.
+    5. Var strikt objektiv. Inga värderingar eller spekulationer.
         Förbjudna ord: tyvärr, lyckligtvis, verkade, kanske, troligen, antar, verkar
-    6. Basera anteckningen UTESLUTANDE på nyckelorden i användarens input. "
-        "Scenariotexten är bara bakgrundsinformation. "
-        "Lägg INTE till detaljer från scenariot som inte nämns i nyckelorden."
+        
+        Om användaren anger ett känslotillstånd (t.ex. "ledsen", "upprörd", "glad")
+        Skriv INTE bort det — formulera om det som en observation:
+        - "ledsen" → "Brukaren uppvisade tecken på nedstämdhet"
+        - "upprörd" → "Brukaren uppvisade ett upprörd beteende"
+        - "glad" → "Brukaren uppvisade ett positivt sinnesstämning"
+    6. Basera anteckningen UTESLUTANDE på nyckelorden i användarens input.
+    Scenariotexten är ENBART bakgrundsinformation för kontext — kopiera
+    aldrig meningar eller detaljer därifrån som användaren inte nämnt.
+    Om ett nyckelord saknar detaljer, skriv kortfattat utifrån det som finns.
     7. Max 5 meningar totalt.
     8. Inga avslutande rekommendationer eller förslag till åtgärder.
 
@@ -274,7 +281,7 @@ Gunnel, 91 år, vägrade för tredje gången denna vecka att ta sin ordinerade
 blodtrycksmedicin. Hon uppgav att "tabletterna gör mig illamående".
 Vid ditt försök att förklara vikten av medicinen blev hon upprörd och bad dig lämna rummet.
 Du kontaktade ansvarig sjuksköterska per telefon kl. 14:32.
-Dokumentera avvikelsen. Anteckningen kan komma att granskas juridiskt.
+Dokumentera avvikelsen.
 """
 ]
 
