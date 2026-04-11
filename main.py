@@ -120,7 +120,9 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     4. Använd ALDRIG brukarens namn. Ersätt alltid med "Brukaren".
     5. Var strikt objektiv. Inga värderingar, känslor eller spekulationer.
         Förbjudna ord: tyvärr, lyckligtvis, verkade, kanske, troligen, antar, verkar
-    6. Hitta INTE på information som inte finns i nyckelorden. Om något saknas, utelämna det.
+    6. Basera anteckningen UTESLUTANDE på nyckelorden i användarens input. "
+        "Scenariotexten är bara bakgrundsinformation. "
+        "Lägg INTE till detaljer från scenariot som inte nämns i nyckelorden."
     7. Max 5 meningar totalt.
     8. Inga avslutande rekommendationer eller förslag till åtgärder.
 
