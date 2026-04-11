@@ -204,11 +204,12 @@ if not st.session_state.user_title or st.session_state.user_title.strip() == "":
 
 # --- # HJÄLPFUNKTIONER ---
 
+
+def show_progress_bar(is_ai=False):
     """
     Visar en progressbar som indikerar hur långt användaren kommit
     i scenarierna. Hanterar både manuell och AI-assisterad del.
     """
-def show_progress_bar(is_ai=False):
     prefix = "ai_" if is_ai else ""
     current = st.session_state.get(f"{prefix}scenario", 1)
     total = len(scenarios)
