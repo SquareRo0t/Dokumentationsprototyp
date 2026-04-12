@@ -556,12 +556,20 @@ if st.session_state.started and not st.session_state.finished and not st.session
             key=f"manual_date_{current_scenario}"
         )
     with col2:
-        current_real_time = datetime.now().time()
+# --- FIX: Tvinga fram verklig aktuell tid ---
+        time_key = f"manual_time_{current_scenario}"
+        
+        # Uppdatera alltid till nuvarande tid när scenariot visas
+        if time_key in st.session_state:
+            st.session_state[time_key] = datetime.now().time()
+        else:
+            st.session_state[time_key] = datetime.now().time()
+        
         event_time = st.time_input(
             "Tid för händelsen",
-            value=current_real_time,
-            key=f"manual_time_{current_scenario}"
-        )
+            value=st.session_state[time_key],
+            key=time_key
+    )
 
     st.subheader("Manuell dokumentation")
     st.caption("Välj den kategori som bäst beskriver händelsen.")
