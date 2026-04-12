@@ -3,6 +3,7 @@ import time
 import gspread
 import pandas as pd
 import difflib
+import uuid
 
 from datetime import datetime
 from groq import Groq
@@ -274,7 +275,8 @@ def init_session_state():
             "ai_answers": {}, 
             "ai_scenario_start_times": {},
             "ai_scenario_times": {}, 
-            "participant_id": None          # Används ej aktivt, men reserverad för framtida behov
+            "participant_id": None,          # Används ej aktivt, men reserverad för framtida behov
+            "session_id": str(uuid.uuid4())[:8]  # Unikt ID per session för att särskilja deltagare
     }
 
     for key, value in defaults.items():
@@ -656,12 +658,12 @@ AI_CATEGORIES = [
     "Kommunikation med anhörig/annan personal"
 ]
 
-# Förval av kategori per scenario — måste matcha ett värde i AI_CATEGORIES
+# Förvalt kategori per scenario — måste matcha ett värde i AI_CATEGORIES
 scenario_categories = {
-        1: "Utförda insatser",
-        2: "Hälsoobservation",
-        3: "Avvikelser eller problem"
-    }
+    1: "Utförda insatser",
+    2: "Hälsoobservation",
+    3: "Avvikelser eller problem"
+}
 
 if st.session_state.ai_started and not st.session_state.ai_finished:
     elapsed, current_scenario = get_current_scenario_time(is_ai=True)
@@ -690,11 +692,10 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
 
     st.subheader("AI-assisterad dokumentation")
 
-
     # Hämta förvalt kategori för aktuellt scenario och beräkna index i listan
     default_category = scenario_categories[current_scenario]
     default_index = AI_CATEGORIES.index(default_category)
- 
+
     category = st.selectbox(
         "Kategori",
         AI_CATEGORIES,
@@ -893,7 +894,7 @@ if st.session_state.ai_finished:
                 sus_final += (5 - score)
         sus_score = sus_final * 2.5 # SUS-poäng mellan 0-100
 
-        # Spara till Google Sheets
+        # Spara till Google Sheets (en gång, via save_to_sheets)
         save_to_sheets({
             "created_at": datetime.now().isoformat(),
             "type": "SUMMARY",
@@ -905,12 +906,13 @@ if st.session_state.ai_finished:
             "time_seconds": total_manual,
         })
 
+        # Spara individuella SUS-svar på separat rad
         try:
             ws = get_worksheet()
             ws.append_row([
                 datetime.now().isoformat(),
                 "SUS",
-                "Testdeltagare",
+                f"{st.session_state.get('user_title', 'Testdeltagare')}-{st.session_state.get('session_id', '??')}",
                 "Sammanfattning",
                 total_manual,
                 total_ai,
@@ -920,7 +922,7 @@ if st.session_state.ai_finished:
                 sus_scores[5], sus_scores[6], sus_scores[7], sus_scores[8], sus_scores[9]
             ])
         except Exception as e:
-            st.error(f"Fel vid sparning av SUS: {e}")
+            st.error(f"Fel vid sparning av SUS-detaljer: {e}")
 
         st.balloons()
         st.markdown("### Tack för ditt deltagande!")
