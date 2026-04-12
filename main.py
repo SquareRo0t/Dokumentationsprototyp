@@ -729,8 +729,7 @@ if st.session_state.ai_finished:
     total_ai = int(st.session_state.ai_end_time - st.session_state.ai_start_time)
     total_manual = int(st.session_state.end_time - st.session_state.start_time)
 
-    st.title("Tack för ditt deltagande!")
-    st.markdown("Du är nu klar med uppgiften.")
+    st.title("SUS (System Usability Scale) - standardiserat användbarhetstest")
 
     st.markdown("---")
     st.subheader("Hur upplevde du AI-assisterad dokumentation?")
