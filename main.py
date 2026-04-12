@@ -274,7 +274,7 @@ Du är mitt i ett hektiskt eftermiddagspass. Du har precis gett Erik, 79 år,
 sin ordinerade kvällsmedicin. Han uppger att han känner
 sig ovanligt trött och har svårt att hålla ögonen öppna, trots att han sovit
 under dagen. Du noterar att han rör sig långsammare än vanligt.
-Du har bara några minuter — dokumentera det viktigaste.
+Du har bara några minuter. Dokumentera det viktigaste.
 """,
 
 """Scenario 3
