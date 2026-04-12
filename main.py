@@ -6,6 +6,7 @@ import difflib
 import uuid
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from groq import Groq
 from google.oauth2.service_account import Credentials
 
@@ -552,13 +553,13 @@ if st.session_state.started and not st.session_state.finished and not st.session
     with col1:
         event_date = st.date_input(
             "Datum för händelsen",
-            value=datetime.now().date(),
+            value=datetime.now(ZoneInfo("Europe/Stockholm")).date(),
             key=f"manual_date_{current_scenario}"
         )
     with col2:
         event_time = st.time_input(
             "Tid för händelsen",
-            value=datetime.now().time(),
+            value=datetime.now(ZoneInfo("Europe/Stockholm")).time(),
             key=f"manual_time_{current_scenario}"
         )
 
@@ -602,7 +603,7 @@ if st.session_state.started and not st.session_state.finished and not st.session
 
            # Spara svaret i Google Sheets
             save_to_sheets({
-                "created_at": datetime.now().isoformat(),
+                "created_at": datetime.now(ZoneInfo("Europe/Stockholm")).isoformat(),
                 "type": "manual",
                 "participant_id": f"{st.session_state.get('user_title', 'Vårdpersonal')}-{st.session_state.get('session_id', '??')}",
                 "scenario": current_scenario,
@@ -680,13 +681,13 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
     with col1:
         event_date = st.date_input(
             "Datum för händelsen",
-            value=datetime.now().date(),
+            value=datetime.now(ZoneInfo("Europe/Stockholm")).date(),
             key=f"ai_date_{current_scenario}"
         )
     with col2:
         event_time = st.time_input(
             "Tid för händelsen",
-            value=datetime.now().time(),
+            value=datetime.now(ZoneInfo("Europe/Stockholm")).time(),
             key=f"ai_time_{current_scenario}"
         )
 
@@ -819,7 +820,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
 
             # Spara till Google Sheets med original och diff för analysändamål
             save_to_sheets({
-                "created_at": datetime.now().isoformat(),
+                "created_at": datetime.now(ZoneInfo("Europe/Stockholm")).isoformat(),
                 "type": "ai",
                 "participant_id": f"{st.session_state.get('user_title', 'Vårdpersonal')}-{st.session_state.get('session_id', '??')}",
                 "scenario": current_scenario,
@@ -897,7 +898,7 @@ if st.session_state.ai_finished:
 
         # Spara till Google Sheets
         save_to_sheets({
-            "created_at": datetime.now().isoformat(),
+            "created_at": datetime.now(ZoneInfo("Europe/Stockholm")).isoformat(),
             "type": "SUMMARY",
             "participant_id": f"{st.session_state.get('user_title', 'Vårdpersonal')}-{st.session_state.get('session_id', '??')}",
             "scenario": "TOTAL",
@@ -910,7 +911,7 @@ if st.session_state.ai_finished:
         try:
             ws = get_worksheet()
             ws.append_row([
-                datetime.now().isoformat(),
+                datetime.now(ZoneInfo("Europe/Stockholm")).isoformat(),
                 "SUS",
                 "Testdeltagare",
                                 f"{st.session_state.get('user_title', 'Testdeltagare')}-{st.session_state.get('session_id', '??')}",
