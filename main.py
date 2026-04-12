@@ -556,9 +556,10 @@ if st.session_state.started and not st.session_state.finished and not st.session
             key=f"manual_date_{current_scenario}"
         )
     with col2:
+        current_real_time = datetime.now().time()
         event_time = st.time_input(
             "Tid för händelsen",
-            value=datetime.now().time(),
+            value=current_real_time,
             key=f"manual_time_{current_scenario}"
         )
 
@@ -684,9 +685,10 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
             key=f"ai_date_{current_scenario}"
         )
     with col2:
+        current_real_time = datetime.now().time()
         event_time = st.time_input(
             "Tid för händelsen",
-            value=datetime.now().time(),
+            value=current_real_time,
             key=f"ai_time_{current_scenario}"
         )
 
