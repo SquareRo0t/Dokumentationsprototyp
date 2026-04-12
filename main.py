@@ -44,7 +44,7 @@ def save_to_sheets(data: dict):
             ws.append_row([
                 data.get("created_at"),
                 data.get("type"),
-                data.get("participant_id", st.session_state.get("user_title", "Vårdpersonal")),
+                data.get("participant_id", f"{st.session_state.get('user_title', 'Vårdpersonal')}-{st.session_state.get('session_id', '??')}"),
                 data.get("scenario"),
                 data.get("category", ""),
                 data.get("text", ""),
@@ -58,7 +58,7 @@ def save_to_sheets(data: dict):
             ws.append_row([
                 data.get("created_at"),
                 data.get("type"),
-                data.get("participant_id", st.session_state.get("user_title", "Vårdpersonal")),
+                data.get("participant_id", f"{st.session_state.get('user_title', 'Vårdpersonal')}-{st.session_state.get('session_id', '??')}"),
                 data.get("scenario"),
                 data.get("category", ""),
                 data.get("text", ""),
@@ -602,7 +602,7 @@ if st.session_state.started and not st.session_state.finished and not st.session
             save_to_sheets({
                 "created_at": datetime.now().isoformat(),
                 "type": "manual",
-                "participant_id": st.session_state.get("user_title", "Vårdpersonal"),
+                "participant_id": f"{st.session_state.get('user_title', 'Vårdpersonal')}-{st.session_state.get('session_id', '??')}",
                 "scenario": current_scenario,
                 "category": cat,
                 "text": f"{event_datetime_str} - {text.strip()}",
@@ -819,7 +819,7 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
             save_to_sheets({
                 "created_at": datetime.now().isoformat(),
                 "type": "ai",
-                "participant_id": st.session_state.get("user_title", "Vårdpersonal"),
+                "participant_id": f"{st.session_state.get('user_title', 'Vårdpersonal')}-{st.session_state.get('session_id', '??')}",
                 "scenario": current_scenario,
                 "category": category,
                 "text": final_text,
@@ -897,7 +897,7 @@ if st.session_state.ai_finished:
         save_to_sheets({
             "created_at": datetime.now().isoformat(),
             "type": "SUMMARY",
-            "participant_id": st.session_state.get("user_title", "Vårdpersonal"),
+            "participant_id": f"{st.session_state.get('user_title', 'Vårdpersonal')}-{st.session_state.get('session_id', '??')}",
             "scenario": "TOTAL",
             "category": "",
             "text": f"Manuell: {total_manual}s | AI: {total_ai}s | Skillnad: {total_manual-total_ai}s",
