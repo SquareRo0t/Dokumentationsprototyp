@@ -648,6 +648,21 @@ if st.session_state.finished and not st.session_state.ai_started:
     
 # --- AI-ASSISTERAD DEL - SCENARIO-FORMULÄR MED TEXTGENERERING ---
 
+# Fullständig lista med alla kategorier (samma ordning som i manuell del)
+AI_CATEGORIES = [
+    "Utförda insatser",
+    "Hälsoobservation",
+    "Avvikelser eller problem",
+    "Kommunikation med anhörig/annan personal"
+]
+
+# Förval av kategori per scenario — måste matcha ett värde i AI_CATEGORIES
+scenario_categories = {
+        1: "Utförda insatser",
+        2: "Hälsoobservation",
+        3: "Avvikelser eller problem"
+    }
+
 if st.session_state.ai_started and not st.session_state.ai_finished:
     elapsed, current_scenario = get_current_scenario_time(is_ai=True)
 
@@ -675,22 +690,15 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
 
     st.subheader("AI-assisterad dokumentation")
 
-    # Förval av kategori per scenario baserat på scenariets natur
-    scenario_categories = {
-        1: "Utförda insatser",
-        2: "Hälsoobservation",
-        3: "Avvikelser eller problem"
-    }
 
+    # Hämta förvalt kategori för aktuellt scenario och beräkna index i listan
+    default_category = scenario_categories[current_scenario]
+    default_index = AI_CATEGORIES.index(default_category)
+ 
     category = st.selectbox(
-        "Kategori", 
-        ["Utförda insatser",
-         "Hälsoobservation", 
-         "Avvikelser eller problem", 
-         "Kommunikation med anhörig/annan personal"], 
-        index=["Utförda insatser", "Avvikelser eller problem",
-               "Kommunikation med anhörig/annan personal"]
-               .index(scenario_categories[current_scenario]),
+        "Kategori",
+        AI_CATEGORIES,
+        index=default_index,
         key=f"ai_cat_{current_scenario}"
     )
     
@@ -911,7 +919,6 @@ if st.session_state.ai_finished:
                 sus_scores[0], sus_scores[1], sus_scores[2], sus_scores[3], sus_scores[4],
                 sus_scores[5], sus_scores[6], sus_scores[7], sus_scores[8], sus_scores[9]
             ])
-            st.balloons()
         except Exception as e:
             st.error(f"Fel vid sparning av SUS: {e}")
 
