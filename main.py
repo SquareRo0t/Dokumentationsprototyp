@@ -100,6 +100,94 @@ def validate_output(text: str) -> bool:
             return False
     return True
 
+
+# --- ERROR RATE OCH TASK SUCCESS ---
+ 
+def calculate_error_rate(text: str, doc_type: str = "manual") -> dict:
+    """
+    Kontrollerar strukturella fel i en journalanteckning.
+ 
+    För manuell text kontrolleras:
+    - Om texten är för kort (under 20 ord)
+    - Om förbjudna subjektiva ord förekommer
+    - Om texten saknar beskrivning av åtgärd
+ 
+    För AI-text kontrolleras:
+    - Om IBIC-rubrikerna finns (Observation, Insats/Åtgärd)
+ 
+    Returnerar dict med fel och antal fel.
+    """
+    errors = []
+    words = text.strip().split()
+ 
+    if len(words) < 20:
+        errors.append("För kort text (under 20 ord)")
+ 
+    subjective_words = ["kanske", "troligen", "verkar", "antar",
+                        "tyvärr", "lyckligvis", "bra", "dåligt", "tråkigt"]
+    found = [w for w in subjective_words if w in text.lower()]
+    if found:
+        errors.append(f"Subjektiva/förbjudna ord: {', '.join(found)}")
+ 
+    if doc_type == "manual":
+        action_words = ["hjälpte", "assisterade", "gav", "utförde",
+                        "kontaktade", "informerade", "dokumenterade", "åtgärd"]
+        if not any(w in text.lower() for w in action_words):
+            errors.append("Ingen åtgärd beskriven")
+ 
+    if doc_type == "ai":
+        if "observation" not in text.lower():
+            errors.append("Saknar IBIC-rubrik: Observation")
+        if "insats" not in text.lower() and "åtgärd" not in text.lower():
+            errors.append("Saknar IBIC-rubrik: Insats/Åtgärd")
+ 
+    return {
+        "error_count": len(errors),
+        "errors": errors,
+        "has_errors": len(errors) > 0
+    }
+ 
+ 
+def calculate_task_success(text: str, category: str, scenario: int) -> dict:
+    """
+    Bedömer om en dokumentationsuppgift anses godkänd.
+ 
+    Kriterier:
+    - Texten är tillräckligt lång (minst 20 ord)
+    - Rätt kategori vald för scenariot
+    - Inga förbjudna subjektiva ord
+ 
+    Returnerar dict med success (bool) och anledning.
+    """
+    expected_categories = {
+        1: "Utförda insatser",
+        2: "Utförda insatser",
+        3: "Avvikelser eller problem"
+    }
+ 
+    reasons = []
+    success = True
+ 
+    if len(text.strip().split()) < 20:
+        success = False
+        reasons.append("Text för kort")
+ 
+    expected = expected_categories.get(scenario)
+    if expected and category != expected:
+        success = False
+        reasons.append(f"Fel kategori (valde '{category}', förväntad '{expected}')")
+ 
+    subjective_words = ["kanske", "troligen", "verkar", "antar", "tyvärr", "lyckligvis"]
+    if any(w in text.lower() for w in subjective_words):
+        success = False
+        reasons.append("Innehåller subjektiva ord")
+ 
+    return {
+        "success": success,
+        "reason": ", ".join(reasons) if reasons else "Godkänd",
+    }
+
+
 def query_groq(keywords: str, category: str , scenario_text: str, 
                event_datetime: str = None) -> str:
     
@@ -493,9 +581,12 @@ if st.session_state.started and not st.session_state.finished and not st.session
         else:
             event_datetime = datetime.combine(event_date, event_time)
             event_datetime_str = event_datetime.strftime("%Y-%m-%d %H:%M")
-
             time_spent = elapsed
-           
+
+            # Beräkna fel och task success för manuell text
+            error_result = calculate_error_rate(text.strip(), doc_type="manual")
+            success_result = calculate_task_success(text.strip(), cat, current_scenario)
+
             # Spara svaret lokalt i session state
             st.session_state.manual_answers[current_scenario] = {
                 "category": cat, 
@@ -512,7 +603,12 @@ if st.session_state.started and not st.session_state.finished and not st.session
                 "scenario": current_scenario,
                 "category": cat,
                 "text": f"{event_datetime_str} - {text.strip()}",
-                "keywords": "",
+                "keywords": (
+                    f"Fel: {error_result['error_count']} | "
+                    f"Feltyper: {'; '.join(error_result['errors']) if error_result['errors'] else 'Inga'} | "
+                    f"Success: {success_result['success']} | "
+                    f"Anledning: {success_result['reason']}"
+                ),
                 "time_seconds": time_spent
             })
 
@@ -697,6 +793,11 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
             
             time_spent = elapsed
 
+            # Beräkna fel och task success för AI-text
+            error_result = calculate_error_rate(final_text, doc_type="ai")
+            success_result = calculate_task_success(final_text, category, current_scenario)
+
+
             st.session_state.ai_answers[current_scenario] = final_text
             st.session_state.ai_scenario_times[current_scenario] = elapsed
 
@@ -708,7 +809,14 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
                 "scenario": current_scenario,
                 "category": category,
                 "text": final_text,
-                "keywords": f"Obs: {observation} | Åtgärd: {åtgärd} | Redigerad: {was_edited}" ,
+                "keywords": (
+                    f"Obs: {observation} | Åtgärd: {åtgärd} | "
+                    f"Redigerad: {was_edited} | "
+                    f"Fel: {error_result['error_count']} | "
+                    f"Feltyper: {'; '.join(error_result['errors']) if error_result['errors'] else 'Inga'} | "
+                    f"Success: {success_result['success']} | "
+                    f"Anledning: {success_result['reason']}"
+                ),
                 "time_seconds": time_spent,
                 "original_text": original,
                 "diff_text": diff_text 
