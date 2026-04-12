@@ -565,7 +565,10 @@ if st.session_state.started and not st.session_state.finished and not st.session
 
     cat = st.selectbox(
         "Kategori/Rubrik",
-        ["Utförda insatser", "Avvikelser eller problem", "Kommunikation"],
+        ["Utförda insatser", 
+         "Hälsoobservation",
+         "Avvikelser eller problem", 
+         "Kommunikation med anhörig/annan personal"],
         key=f"man_cat_{current_scenario}"
     )
     
@@ -675,13 +678,16 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
     # Förval av kategori per scenario baserat på scenariets natur
     scenario_categories = {
         1: "Utförda insatser",
-        2: "Utförda insatser",
+        2: "Hälsoobservation",
         3: "Avvikelser eller problem"
     }
 
     category = st.selectbox(
         "Kategori", 
-        ["Utförda insatser", "Avvikelser eller problem", "Kommunikation med anhörig/annan personal"], 
+        ["Utförda insatser",
+         "Hälsoobservation", 
+         "Avvikelser eller problem", 
+         "Kommunikation med anhörig/annan personal"], 
         index=["Utförda insatser", "Avvikelser eller problem",
                "Kommunikation med anhörig/annan personal"]
                .index(scenario_categories[current_scenario]),
