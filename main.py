@@ -24,7 +24,7 @@ def get_worksheet():
             ]
         )
 
-        # Auktorisera klienten och öppna det namngivna kalkylbladet
+  # Auktorisera klienten och öppna det namngivna kalkylbladet
         client = gspread.authorize(credentials)
         sheet = client.open("Dokumentationsprototyp - Svar")
         worksheet = sheet.worksheet("Sheet1")
@@ -205,7 +205,6 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     2. Använd IBIC struktur med tydliga rubriker:
         - Observation: Vad observerades objektivt (fakta inte tolkningar)
         - Insats/Åtgärd: Vad personalen konkret utförde
-        - Effekt: Mätbart eller observerbart resultat - om ingen effekt angetts, utelämna hela avsnittet helt och skriv ingenting
     3. Skriv i tredje person om personalen ("Personalen", "Undersköterskan").
     4. Använd ALDRIG brukarens namn. Ersätt alltid med "Brukaren".
     5. Var strikt objektiv. Inga värderingar eller spekulationer.
@@ -220,7 +219,7 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     Scenariotexten är ENBART bakgrundsinformation för kontext — kopiera
     aldrig meningar eller detaljer därifrån som användaren inte nämnt.
     Om ett nyckelord saknar detaljer, skriv kortfattat utifrån det som finns.
-    7. Max 5 meningar totalt.
+    7. Max 7 meningar totalt.
     8. Inga avslutande rekommendationer eller förslag till åtgärder.
 
     Exempel på fel vs rätt:
@@ -236,7 +235,12 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     Datum och tid för händelsen: {event_datetime}
     Nyckelord/observationer {keywords}
 
-    Skriv en korrekt journalanteckning enligt reglerna ovan.
+    Bakgrundskontext (använd EJ som källa — bara för att förstå situationen):
+    {scenario_text}
+
+    VIKTIGT: Formulera om nyckelorden till korrekt journalspråk.
+    Kopiera INTE nyckelorden ordagrant — skriv om dem professionellt.
+    Basera anteckningen ENBART på nyckelorden ovan, inte på bakgrundskontexten.
     """
     try:
         response = client.chat.completions.create(
