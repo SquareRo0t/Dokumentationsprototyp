@@ -712,14 +712,14 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
     # Separata fält för observation och åtgärd för tydligare struktur
     observation = st.text_area(
         "Beskrivning av händelse/Observation",
-        placeholder="t.ex. Brukaren fick hjälp med lunch. Brukaren åt ungefär halva portionen...",
+        #placeholder="t.ex. Brukaren fick hjälp med lunch. Brukaren åt ungefär halva portionen...",
         key=f"ai_obs_{current_scenario}",
         height=100
     )
 
     åtgärd = st.text_area(
         "Åtgärd/Insats",
-        placeholder="t.ex. Hjälpte till att skära maten, uppmuntrade att äta, serverade extra dryck...",
+        #placeholder="t.ex. Hjälpte till att skära maten, uppmuntrade att äta, serverade extra dryck...",
         key=f"ai_åtgärd_{current_scenario}",
         height=100
     )
