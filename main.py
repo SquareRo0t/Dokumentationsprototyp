@@ -193,7 +193,7 @@ def calculate_task_success(text: str, category: str, scenario: int) -> dict:
 def query_groq(keywords: str, category: str , scenario_text: str, 
                event_datetime: str = None) -> str:
     
-    # Regel 1: Struktur (hard constraint via prompt)
+# Regel 1: Struktur (hard constraint via prompt)
     """Genererar professionell journalanteckning med Groq"""
     
     system_prompt ="""
@@ -215,6 +215,7 @@ def query_groq(keywords: str, category: str , scenario_text: str,
         - "ledsen" → "Brukaren uppvisade tecken på nedstämdhet"
         - "upprörd" → "Brukaren uppvisade ett upprörd beteende"
         - "glad" → "Brukaren uppvisade ett positivt sinnesstämning"
+
     6. Basera anteckningen UTESLUTANDE på nyckelorden i användarens input.
     Scenariotexten är ENBART bakgrundsinformation för kontext — kopiera
     aldrig meningar eller detaljer därifrån som användaren inte nämnt.
@@ -222,12 +223,6 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     7. Max 7 meningar totalt.
     8. Inga avslutande rekommendationer eller förslag till åtgärder.
 
-    Exempel på fel vs rätt:
-    Fel - "Brukaren verkade nöjd och mådde troligen bra efter måltiden"
-    Rätt - "Brukaren uppgav att hen mådde bra efter måltiden"
-
-    Fel - "Det kan vara bra att följa upp blodtrycket framöver"
-    Rätt - (Ingen mening alls - rekommendationer utelämnas)
     """
     user_prompt = f"""
     Scenario: {scenario_text}
@@ -241,7 +236,10 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     VIKTIGT: Formulera om nyckelorden till korrekt journalspråk.
     Kopiera INTE nyckelorden ordagrant — skriv om dem professionellt.
     Basera anteckningen ENBART på nyckelorden ovan, inte på bakgrundskontexten.
+    - Lägg INTE till information som inte finns i nyckelorden.
+
     """
+
     try:
         response = client.chat.completions.create(
             model = "llama-3.3-70b-versatile", # Bäst presterande modell i test
