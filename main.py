@@ -225,7 +225,7 @@ def query_groq(keywords: str, category: str , scenario_text: str,
 
     """
     user_prompt = f"""
-    Scenario: {scenario_text}
+  
     Kategori: {category}
     Datum och tid för händelsen: {event_datetime}
     Nyckelord/observationer {keywords}
