@@ -24,7 +24,7 @@ def get_worksheet():
             ]
         )
 
-  # Auktorisera klienten och öppna det namngivna kalkylbladet
+       # Auktorisera klienten och öppna det namngivna kalkylbladet
         client = gspread.authorize(credentials)
         sheet = client.open("Dokumentationsprototyp - Svar")
         worksheet = sheet.worksheet("Sheet1")
@@ -193,7 +193,7 @@ def calculate_task_success(text: str, category: str, scenario: int) -> dict:
 def query_groq(keywords: str, category: str , scenario_text: str, 
                event_datetime: str = None) -> str:
     
-# Regel 1: Struktur (hard constraint via prompt)
+    # Regel 1: Struktur (hard constraint via prompt)
     """Genererar professionell journalanteckning med Groq"""
     
     system_prompt ="""
@@ -203,9 +203,9 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     HÅRDA REGLER - bryt aldrig dessa:
     1. Skriv ENDAST på svenska.
     2. Använd IBIC struktur med tydliga rubriker:
-        - Observation: Vad observerades objektivt (fakta inte tolkningar)
-        - Insats/Åtgärd: Vad personalen konkret utförde
-    3. Skriv i tredje person om personalen ("Personalen", "Undersköterskan").
+        - observation: Vad observerades objektivt (fakta inte tolkningar)
+        - åtgärd/insats: Vad personalen konkret utförde
+    3. Skriv i tredje person om personalen ("Personalen").
     4. Använd ALDRIG brukarens namn. Ersätt alltid med "Brukaren".
     5. Var strikt objektiv. Inga värderingar eller spekulationer.
         Förbjudna ord: tyvärr, lyckligtvis, verkade, kanske, troligen, antar, verkar
@@ -222,10 +222,20 @@ def query_groq(keywords: str, category: str , scenario_text: str,
     Om ett nyckelord saknar detaljer, skriv kortfattat utifrån det som finns.
     7. Max 7 meningar totalt.
     8. Inga avslutande rekommendationer eller förslag till åtgärder.
+    9. Undvik upprepningar av ord i början av varje mening.
+        Variera meningsstruktur naturligt, men behåll objektiv ton.
+        Använd pronomen ("hen") eller omformuleringar där det är lämpligt, utan att bli otydlig.
+    10. Skriv sammanhängande text med naturligt flyt.
+    Undvik att skriva varje observation som en separat mening.
+    Kombinera relaterad information där det är lämpligt.
+    11. Börja inte varje mening med "Brukaren".
+    Variera meningsstart genom att ibland börja med tid, aktivitet eller observation.
+
+    
 
     """
     user_prompt = f"""
-  
+
     Kategori: {category}
     Datum och tid för händelsen: {event_datetime}
     Nyckelord/observationer {keywords}
@@ -756,6 +766,12 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
     if st.session_state.get(f"ai_show_{current_scenario}", False):
         st.divider()
         st.subheader("2. Journalanteckning")
+        
+        st.info("""
+                För att få ett bättre AI-förslag (Gör detta om du inte är nöjd med texten):
+                - Lägg till eller justera nyckelord innan du genererar igen
+                - Undvik att klicka "Generera ny text" flera gånger utan ändringar
+                """)
 
         regen_count = st.session_state.get(f"regen_count_{current_scenario}", 0)
         
@@ -776,6 +792,16 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
             st.session_state[f"ai_show_{current_scenario}"] = False
         else:
             if st.button("Generera ny text", key=f"regenerate_{current_scenario}"):
+
+                current_input = f"{observation.strip()} {åtgärd.strip()}"
+                previous_input = st.session_state.get(f"last_input_{current_scenario}","")
+
+                if current_input == previous_input:
+                    st.warning("Lägg till eller ändra nyckelord innan du genererar en ny text")
+                    st.stop()
+                
+                st.session_state[f"last_input_{current_scenario}"] = current_input
+
                 event_datetime_str = datetime.combine(event_date, event_time).strftime("%Y-%m-%d %H:%M")
                 with st.spinner("Genererar nytt förslag..."):
                     generated = query_groq(
@@ -787,7 +813,6 @@ if st.session_state.ai_started and not st.session_state.ai_finished:
                 if generated:
                     st.session_state[f"ai_result_{current_scenario}"] = generated
                     st.session_state[f"ai_result_{current_scenario}_original"] = generated
-
                     # Öka räknaren för att tvinga fram ny widget-instans
                     st.session_state[f"regen_count_{current_scenario}"] += 1
                     st.rerun()
@@ -887,6 +912,19 @@ if st.session_state.ai_finished:
             key=f"sus_{i}"
         )
         sus_scores.append(score)
+
+    st.markdown("---")
+    st.subheader("Övrig feedback (valfritt)")
+
+    feedback_text = st.text_area(
+        "Feedback",
+        placeholder="""
+        - Vad fungerade bra?
+        - Vad var frustrerande?
+        - När var AI:n hjälpsam/inte hjälpsam?
+        """,
+        height=200
+    )
     
     if st.button("Skicka in svar och avsluta", type="primary"):
         # Beräkna SUS-poäng (standardformel)
@@ -906,7 +944,7 @@ if st.session_state.ai_finished:
             "scenario": "TOTAL",
             "category": "",
             "text": f"Manuell: {total_manual}s | AI: {total_ai}s | Skillnad: {total_manual-total_ai}s",
-            "keywords": f"SUS: {sus_score}",
+            "keywords": f"SUS: {sus_score} | Feedback: {feedback_text}",
             "time_seconds": total_manual,
         })
 
